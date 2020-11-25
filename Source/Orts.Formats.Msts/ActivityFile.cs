@@ -455,6 +455,7 @@ namespace Orts.Formats.Msts
         public Duration(int h, int m) {
             Hour = h;
             Minute = m;
+            Second = 0;
         }
 
         public Duration(STFReader stf) {
@@ -464,7 +465,12 @@ namespace Orts.Formats.Msts
             stf.MustMatch(")");
         }
 
-        public String FormattedDurationTime()
+        public int ActivityDuration()
+        {
+            return Hour* 3600 + Minute* 60 + Second; // Convert time to seconds
+        }
+
+    public String FormattedDurationTime()
         {
             return Hour.ToString("00") + ":" + Minute.ToString("00");
         }

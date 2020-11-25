@@ -49,8 +49,7 @@ Basic AI Functionality
   Activity and Timetable modes, while waiting points can only be used in Activity 
   mode.
 - AI trains throw switches not lined properly before engaging them.
-- In activity mode AI trains can perform shunting actions, provided the 
-  :ref:`Extended AI shunting <operation-ai-shunting>` option has been selected.
+- In activity mode AI trains can perform shunting actions.
 - Priorities: AI trains should start as scheduled as long as there is no other 
   AI train already on a conflict path.
 
@@ -419,8 +418,7 @@ Waiting points cannot be used in Timetable mode.
 Absolute Waiting Points
 -----------------------
 
-When the :ref:`Extended AI shunting <operation-ai-shunting>` option is selected 
-and OR is not in Timetable Mode, waiting points with a *waiting time* between 
+Waiting points with a *waiting time* between 
 30000 and 32359 are interpreted as absolute time-of-day waiting points, with a 
 format 3HHMM, where HH and MM are the hour and minute of the day in standard 
 decimal notation.
@@ -725,8 +723,10 @@ Extended AI Train Shunting
 General
 -------
 
-When this option is selected further AI train shunting functions are available. 
-Note that this option is not available in Timetable mode.
+Having AI trains performing shunting operations ensures more interesting and varied activities.
+
+Note that this feature is not available in Timetable mode, which has other ways to 
+perform AI Train shunting.
 
 The following additional shunting functions are available:
 
@@ -1488,13 +1488,18 @@ This function uses approach control for the 'lower' route.::
     // Get draw state
     draw_state = def_draw_state (state);
 
-TrainHasCallOn Function
------------------------
+TrainHasCallOn, TrainHasCallOn_Advanced Functions
+-------------------------------------------------
 
 This function is intended specifically to allow trains to 'call on' in 
 Timetable mode when allowed to do so as defined in the timetable. The use of 
 this function allows a train to 'call on' into a platform in Timetable mode 
 without jeopardizing the functionality in normal Activity mode.
+
+The Function TrainHasCallOn will open the Signal only if the train has arrived 
+on the block before the Signal. If the Signal shall open earlier, use the 
+TrainHasCallOn_Advanced Function instead, the opening of the Signal will then 
+follow the rules of the Sigcfg.dat-Parameter SignalNumClearAhead().
 
 It is a Boolean function and returns state as follows:
 
@@ -1556,12 +1561,22 @@ Example (part of script only)::
         }
     }
 
-TrainHasCallOn_Restricted Function
-----------------------------------
+TrainHasCallOn_Restricted, TrainHasCallOn_Restricted_Advanced Functions
+-----------------------------------------------------------------------
 
 This function has been introduced because signals with call-on aspects can be 
 used not only as entrance signals for stations, but also on 'free line' 
 sections, that is, away from stations.
+
+The Function TrainHasCallOn_Restricted will open the Signal only if the train 
+has arrived on the block before the Signal. If the Signal shall open earlier, 
+use the TrainHasCallOn_Restricted_Advanced Function instead. the opening of 
+the Signal will then follow the rules of the Sigcfg.dat Parameter 
+SignalNumClearAhead().
+
+In next lines, where ``TrainHasCallOn`` appears, ``TrainHasCallOn`` and 
+``TrainHasCallOn_Advanced`` is meant; analogously, when ``TrainHasCallOn_Restricted`` 
+appears, ``TrainHasCallOn_Restricted`` and ``TrainHasCallOn_Restricted_Advanced`` is meant.
 
 ``TrainHasCallOn`` always allows call-on if the signal is on a 'free-line' 
 section. This is to allow proper working for USA-type permissive signals.
@@ -1749,6 +1764,9 @@ lines within such EventCategory block must be present in the extension .act file
 No Halt by Activity Message Box
 -------------------------------
 
+.. index::
+   single: ORTSContinue
+
 MSTS activities may contain instructions to display a message box when the 
 player train reaches a specific location in the activity, or at a specific 
 time. Normally the simulation is halted when the message box is displayed until 
@@ -1783,9 +1801,6 @@ does not work for the terminating event of the activity.
 AI Train Horn Blow
 ------------------
 
-This feature requires selection of the :ref:`Extended AI train shunting option 
-<options-ai-shunting>`.
-
 Horn blow by AI trains is achieved by inserting into the AI train path a 
 waiting point with a waiting time value between 60011 (1 second horn blow) and 
 60020 (10 seconds horn blow).
@@ -1800,12 +1815,20 @@ On the other hand, a horn blow waiting point may be positioned just after a
 normal WP (thus achieving the effect that the train blows the horn when it 
 restarts).
 
+If the lead locomotive of the AI train has parameter DoesHornTriggerBell 
+set to 1 in the .eng file, the bell is played for further 30 seconds after 
+the end of the horn blow.
+
 To implement this feature it is not necessary to proceed as described in the 
 first three paragraphs of this chapter. It is enough to insert the waiting 
 points within the paths with either the MSTS AE or through TrackViewer.
 
 AI Horn Blow at Level Crossings
 -------------------------------
+
+.. index::
+   single: ORTSAIHornAtCrossings
+   single: NextActivityObjectUID
 
 If the line::
 
@@ -1824,10 +1847,17 @@ the route with TrackViewer allows identification of the true level crossings.
 If a horn blow is also desired for a *simple* road crossing, the feature *AI 
 Train Horn Blow* described above must be used.
 
+If the lead locomotive of the AI train has parameter DoesHornTriggerBell 
+set to 1 in the .eng file, the bell is played for further 30 seconds after 
+the end of the horn blow.
+
 .. _operation-event-triggered-by-ai-train:
 
 Location Event triggered by AI Train
 ------------------------------------
+
+.. index::
+   single: ORTSTriggeringTrain
 
 Under MSTS location events may only be triggered when the player train reaches 
 them. OR provides also location events that are triggered by AI trains.
@@ -1851,6 +1881,11 @@ This feature is not yet managed by TSRE5.
 
 Location Event and Time Event Sound File
 ----------------------------------------
+
+.. index::
+   single: ORTSActivitySound
+   single: ORTSActSoundFile
+   single: ORTSSoundLocation
 
 An activity file can be modified so that a sound file is played when the train 
 reaches a location specified in an EventTypeLocation event in the .act file, 
@@ -1884,6 +1919,18 @@ to the ``EventCategoryLocation`` or ``EventCategoryTime`` event, where:
 
 Note: Parameter ORTSSoundLocation is needed only when *Soundtype* is ``Location``.
 
+.. index::
+   single: EventCategoryLocation
+   single: EventCategoryTime
+   single: EventTypeLocation
+   single: Activation_Level
+   single: Outcomes
+   single: DisplayMessage
+   single: Name
+   single: Location
+   single: TriggerOnStop
+   single: ORTSContinue
+
 For example::
 
     EventCategoryLocation (
@@ -1913,6 +1960,21 @@ This feature is not yet managed by TSRE5 in this format.
 
 Weather Change Activity Event 
 -----------------------------
+
+.. index::
+   single: ORTSWeatherChange
+   single: ORTSOvercast
+   single: final_overcastFactor
+   single: overcast_transitionTime
+   single: ORTSFog
+   single: final_fogDistance
+   single: fog_transitionTime
+   single: ORTSPrecipitationIntensity
+   single: final_precipitationIntensity
+   single: precipitationIntensity_transitionTime
+   single: ORTSPrecipitationLiquidity
+   single: final_precipitationLiquidity
+   single: precipitationLiquidity_transitionTime
 
 An activity can be modified so that the weather changes when running the 
 activity in ORTS. MSTS operation is not affected by these WeatherChange events. 
@@ -1962,6 +2024,9 @@ to pass from the initial weather feature value (overcastFactor, fogDistance
 and so on) to the final weather feature value. If such xx_transitionTime is 
 set to 0, the weather feature takes immediately the final value. This is 
 useful to start activities with weather features in intermediate states.
+
+.. index::
+   single: ORTSContinue
 
 The event can also include an ORTSContinue ( 0 ) line, therefore not displaying 
 messages and not suspending activity execution.
@@ -2024,6 +2089,19 @@ Syntax of the feature
 '''''''''''''''''''''
 To make use of this feature it is suggested to generate an :ref:`Extension activity 
 file <operation-extension-activity-file>` .
+
+.. index::
+   single: Tr_Activity
+   single: Tr_Activity_File
+   single: Events
+   single: EventCategoryLocation
+   single: ORTSContinue
+   single: Outcomes
+   single: ORTSRestartWaitingTrain
+   single: ORTSWaitingTrainToRestart
+   single: ORTSDelayToRestart
+   single: ORTSMatchingWPDelay
+
 Here is an example of an extension activity file using such feature::
 
   SIMISA@@@@@@@@@@JINX0a0t______
@@ -2082,6 +2160,10 @@ Old formats
 
 Following alternate formats are accepted by OR for Event Sound Files and 
 Weather Change. These formats are not recommended for new activities.
+
+.. index::
+   single: ORTSActSoundFile
+   single: ORTSWeatherChange
 
 Event Sound Files: The sound file may be defined by a single line::
 

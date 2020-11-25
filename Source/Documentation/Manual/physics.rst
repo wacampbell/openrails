@@ -49,6 +49,11 @@ with the Open Rails Davis equation. If no-FCalc Friction parameters are
 used in the .wag file, Open Rails ignores those values, substituting its
 actual Davis equation values for the train car.
 
+.. index::
+   single: ORTSDavis_A
+   single: ORTSDavis_B
+   single: ORTSDavis_C
+   
 A basic (simplified) Davis formula is used in the following form:
 
 F\ :sub:`res` = ORTSDavis_A + speedMpS * (ORTSDavis_B + ORTSDavis_C * speedMpS\ :sup:`2`\ )
@@ -59,12 +64,21 @@ one of the *ORTSDavis* components is zero, *FCalc* is used. Therefore, e.g.
 if the data doesn't contain the B part of the Davis formula, a very small
 number should be used instead of zero.
 
+.. index::
+   single: ORTSMergeSpeed
+   single: ORTSStandstillFriction
+
 When a car is pulled from steady state, an additional force is needed due
 to higher bearing forces. The situation is simplified by using a different
-calculation at low speed (5 mph and lower). Empirical static friction
-forces are used for different classes of mass (under 10 tons, 10 to 100
+calculation at low speed (``ORTSMergeSpeed`` and lower). Empirical static
+friction forces are used for different classes of mass (under 10 tons, 10 to 100
 tons and above 100 tons). In addition, if weather conditions are poor
-(snowing is set), the static friction is increased.
+(snowing is set), the static friction is increased. This low-speed friction
+force can be manually specified with ``ORTSStandstillFriction``.
+
+.. index::
+   single: ORTSTrackGauge
+   single: ORTSRigidWheelBase
 
 When running on a curve and if the
 :ref:`Curve dependent resistance <options-curve-resistance>` option is
@@ -88,6 +102,35 @@ Coupler Slack
 Slack action for couplers is introduced and calculated the same way as in
 MSTS.
 
+Hot Wheel Bearings
+------------------
+
+Open Rails (OR) has instead used a representative bearing heat model to simulate 
+the typical outcomes for bearing temperature heating or cooling effects.
+
+- Bearing heats up and cools down as the train moves and stops.
+- Bearing resistance in cold weather is significantly higher then when the 
+  bearing is at its 'normal' operating temperature. Typically railway companies 
+  elected to reduce loads for trains in cold conditions. The OR model will 
+  reduce the car resistance as the bearing heats up, and it will increase 
+  resistance as the bearing cools down.
+- OR has a built in temperature model to determine the ambient temperature. The 
+  ambient temperature is calculated based upon a world model of the average 
+  temperatures at various latitudes. OR will use the latitude of the route to 
+  calculate the ambient temperature. As ambient temperature also decreases with 
+  height above sea level, OR takes this into account as well, and varies the 
+  temperature accordingly.
+- Depending upon the ``ActivityRandomizationLevel`` setting in the Option menu, 
+  an overheating bearing (hotbox) may be randomly initialized on any trailing 
+  car in the train (locomotives and tenders are excepted from overheating 
+  bearings). The Hotbox will be activated randomly within the first 66% of the 
+  activity duration. So for example, in an activity with a 20 minute duration, 
+  a hotbox will only be activiated in the first 12 minutes of the activity, if 
+  it has been initialised.
+
+A special smoke effect,  ``BearingHotboxFX``, can be added adjacent to the wagon hot box. 
+This will be triggered if the bearing overheats.
+
 .. _physics-adhesion:
 
 Adhesion of Locomotives -- Settings Within the Wagon Section of ENG files
@@ -97,6 +140,10 @@ MSTS calculates the adhesion parameters based on a very strange set of
 parameters filled with an even stranger range of values. Since ORTS is not
 able to mimic the MSTS calculation, a standard method based on the
 adhesion theory is used with some known issues in use with MSTS content.
+
+.. index::
+   single: ORTSAdhesion
+   single: ORTSCurtius_Kniffler
 
 MSTS ``Adheasion`` (sic!) parameters are not used in ORTS. Instead, a new
 set of parameters is used, which must be inserted within the ``Wagon``
@@ -116,6 +163,10 @@ acceleration of gravity (9.81), as better explained later.
 
 The adhesion limit is only considered in the adhesion model of locomotives.
 
+.. index::
+   single: ORTSSlipWarningThreshold
+   single: ORTSInertia
+   
 The adhesion model is calculated in two possible ways. The first one -- the
 simple adhesion model -- is based on a very simple threshold condition and
 works similarly to the MSTS adhesion model. The second one -- the advanced
@@ -239,6 +290,9 @@ Another option is to use a Moving average filter available in the
 the more stable the simulation will be. However, the higher value causes
 slower dynamic response. The recommended range is between 10 and 50.
 
+.. index::
+   single: ORTSWheelSlipCausesThrottleDown
+
 To match some of the real world features, the *Wheel slip* event can
 cause automatic zero throttle setting. Use the ``Engine (ORTS
 (ORTSWheelSlipCausesThrottleDown))`` Boolean value of the ENG file.
@@ -262,6 +316,57 @@ classes of engines. Diesel engines can be started or stopped by pressing
 the START/STOP key (``<Shift+Y>`` in English keyboards). The starting and
 stopping sequence is driven by a *starter* logic, which can be customized,
 or is estimated by the engine parameters.
+
+The diesel electric locomotive uses a diesel prime mover to generate electricity 
+(using generators naturally) and this electricity is then used to drive 
+traction motors to turn the wheels. The other types of diesel locomotives are 
+similar from the perspective that they have a diesel prime mover, and then some 
+form of transmission mechanism to transfer the power output of the prime 
+mover to the locomotive wheels.
+
+In configuring the locomitve correctly it is important to use the correct 
+power/force values. The key values required in the ENG file for a diesel 
+locomotive (regardless of transmission type) are as follows:
+
+.. index::
+   single: ORTSDieselEngineMaxPower
+   single: MaxPower
+   single: MaxForce
+   single: MaxContinuousForce
+
+``ORTSDieselEngineMaxPower`` ==> sets the maximum power output at the 
+shaft of the diesel engine (or prime mover).
+
+``MaxPower`` ==> sets the maximum power at the rail (provided to the wheels).
+
+``MaxForce`` ==> sets the force that the locomotive is able to apply to the 
+wheels when starting. 
+
+``MaxContinuousForce`` ==> is the maximum force that the locomotive can 
+continuously supply to the wheels without exceeding the design specifications. 
+Typically this is linked to a particular speed (see next parameter).
+
+.. index::
+   single: ORTSSpeedOfMaxContinuousForce
+   single: MaxVelocity
+   
+``ORTSSpeedOfMaxContinuousForce`` ==> is the speed at which the maximum force 
+will be applied.
+
+``MaxVelocity`` ==> is the maximum rated design speed of the locomotive. 
+Some locomotives had a speed alarm which applied the brakes, or set the throttle 
+to a lower value. This can be modelled using the OverspeedMonitor function.
+
+.. index::
+   single: ORTSUnloadingSpeed
+
+``ORTSUnloadingSpeed`` ==> is the locomotive speed when the generator reaches 
+its maximum voltage, and due to the speed of the train, the engine starts 
+to 'unload'. Typically beyond this speed, power output of the locomotive 
+will decrease.
+
+If using power/force Tables, then some of the above values will not be 
+required, see the sections below for details.
 
 Starting the Diesel Engine
 ''''''''''''''''''''''''''
@@ -334,6 +439,36 @@ diesel engines is not limited.
 If the ORTS specific definition is used, each parameter is tracked and if
 one is missing (except in the case of those marked with *Optional*), the
 simulation falls back to use MSTS parameters.
+
+.. index::
+   single: Engine
+   single: ORTSDieselEngines
+   single: Diesel
+   single: IdleRPM
+   single: MaxRPM
+   single: StartingRPM
+   single: StartingConfirmRPM
+   single: ChangeUpRPMpS
+   single: ChangeDownRPMpS
+   single: RateOfChangeUpRPMpSS
+   single: RateOfChangeDownRPMpSS
+   single: MaximalPower
+   single: IdleExhaust
+   single: MaxExhaust
+   single: ExhaustDynamics
+   single: ExhaustDynamicsDown
+   single: ExhaustColor
+   single: ExhaustTransientColor
+   single: DieselPowerTab
+   single: DieselConsumptionTab
+   single: ThrottleRPMTab
+   single: DieselTorqueTab
+   single: MinOilPressure
+   single: MaxOilPressure
+   single: Cooling
+   single: TempTimeConstant
+   single: OptTemperature
+   single: IdleTemperature
 
 +---------------------------------+------------------------------------+
 |::                               |::                                  |
@@ -467,6 +602,15 @@ available, thus the diesel engine power also supplies auxiliaries and
 other loads. Therefore, the output power will always be lower than the
 diesel engine rated power.
 
+.. index::
+   single: ORTSTractionCharacteristics
+   single: ORTSMaxTractiveForceCurves
+   single: MaxForce
+   single: MaxPower
+   single: MaxVelocity
+   single: ThrottleRPMTab
+   single: DieselEngineType
+
 In ORTS, the diesel-electric locomotive can use
 ``ORTSTractionCharacteristics`` or tables of ``ORTSMaxTractiveForceCurves``
 to provide a better approximation to real world performance. If a table is
@@ -487,6 +631,11 @@ and the ``DieselEngineType`` is *electric*.
 Diesel-Mechanical Locomotives
 -----------------------------
 
+.. index::
+   single: GearBoxBackLoadForce
+   single: GearBoxCoastingForce
+   single: GearBoxEngineBraking
+
 ORTS features a mechanical gearbox feature that mimics MSTS behavior,
 including automatic or manual shifting. Some features not well described
 in MSTS are not yet implemented, such as ``GearBoxBackLoadForce``,
@@ -498,6 +647,10 @@ that are more precise.
 
 Electric Locomotives
 ====================
+
+.. index::
+   single: MaxPower
+   single: MaxForce
 
 At the present time, diesel and electric locomotive physics calculations
 use the default engine physics. Default engine physics simply uses the
@@ -522,6 +675,11 @@ pantograph in the 3D model is up or down, you can set some additional
 parameters in order to add a delay between the time when the command to
 raise the pantograph is given and when the pantograph is actually up.
 
+.. index::
+   single: ORTSPantographs
+   single: Pantograph
+   single: Delay
+
 In order to do this, you can write in the Wagon section of your .eng file
 or .wag file (since the pantograph may be on a wagon) this optional
 structure::
@@ -542,6 +700,12 @@ limitations or speed restrictions.
 3rd and 4th Pantograph
 ----------------------
 
+.. index::
+   single: ORTSPantographs
+   single: Pantograph
+   single: ORTS_PANTOGRAPH3
+   single: ORTS_PANTOGRAPH4
+
 Open Rails supports up to 4 pantographs per locomotive. If three or four 
 pantographs are present, the above ORTSPantographs() block is mandatory, 
 and must contain a number of Pantograph() blocks equal to the number of 
@@ -551,6 +715,7 @@ for Pantograph 2 (replacing 2 with 3 and 4).
 The third panto is moved with Ctrl-P, while the fourth panto is moved with Ctrl-Shift-P.
 The cabview controls must be named ORTS_PANTOGRAPH3 and ORTS_PANTOGRAPH4.
 
+.. _physics-circuit-breaker:
 
 Circuit breaker
 ---------------
@@ -561,6 +726,10 @@ and *Control Circuit Breaker Closing Authorization* commands
 ( ``<O>``, ``<I>`` and ``<Shift+O>`` by default ). The status of the circuit breaker
 is indicated by the *Circuit breaker* value in the HUD view.
 
+.. index::
+   single: ORTSCircuitBreaker
+   single: ORTSCircuitBreakerClosingDelay
+
 Two default behaviours are available:
 
 - By default, the circuit breaker of the train closes as soon as power is available
@@ -570,12 +739,14 @@ Two default behaviours are available:
   of the ENG file.
 
 In order to model a different behaviour of the circuit breaker,
-a scripting interface is available. The script can be loaded with the
-parameter ``ORTSCircuitBreaker( <name of the file> )``.
+a :ref:`scripting interface <features-scripting-cb>` is available. The script
+can be loaded with the parameter ``ORTSCircuitBreaker( <name of the file> )``.
 
 In real life, the circuit breaker does not
 close instantly, so you can add a delay with the optional parameter
 ``ORTSCircuitBreakerClosingDelay( )`` (by default in seconds).
+
+.. _physics-power-supply:
 
 Power supply
 ------------
@@ -583,11 +754,18 @@ Power supply
 The power status is indicated by the *Power* value in the HUD
 view.
 
+.. index::
+   single: ORTSPowerOnDelay
+   single: ORTSAuxPowerOnDelay
+
 The power-on sequence time delay can be adjusted by the optional
 ``ORTSPowerOnDelay( )`` value (for example: ``ORTSPowerOnDelay( 5s )``) within
 the Engine section of the .eng file (value in seconds). The same delay for
 auxiliary systems can be adjusted by the optional parameter
 ``ORTSAuxPowerOnDelay( )`` (by default in seconds).
+
+A :ref:`scripting interface <features-scripting-eps>` to customize the behavior
+of the power supply is also available.
 
 .. _physics-steam:
 
@@ -1114,11 +1292,61 @@ functions when desired.
 If theses controls are not used, then the AI fireman operates in the same
 fashion as previously.
 
+Steam Boiler Heat Radiation Loss
+''''''''''''''''''''''''''''''''
+
+A certain amount of heat is lost from the boiler of a steam locomotive. An 
+uninsulated boiler could lose a lot of heat and this impacts on the 
+performance of the locomotive, hence boilers were insulated to reduce the 
+heat losses.
+
+The amount of heat lost will be dependent upon the exposed surface area of 
+the boiler, the difference in temperature between the boiler and the ambient 
+temperature. The amount of heat lost will also increase as the speed of the 
+locomotive increases.
+
+OR models the heat loss from a boiler with some standard default settings, 
+however the model can be customised to suit the locomotive by adjusting the 
+following settings.
+
+.. index::
+   single: ORTSBoilerSurfaceArea
+   single: ORTSFractionBoilerInsulated
+   single: ORTSHeatCoefficientInsulation
+
+- ``ORTSBoilerSurfaceArea`` - Surface area of the boiler / fire box that impacts heat loss. Default UoM - (ft\ :sup:`2`)
+
+- ``ORTSFractionBoilerInsulated`` - Fraction of boiler surface area covered by insulation (less then 1)
+
+- ``ORTSHeatCoefficientInsulation`` - Thermal conduction coefficient. Default UoM - (BTU / (ft\ :sup:`2` / hr.) / (1 (in. / F)) 
+
+Steam Boiler Blowdown
+'''''''''''''''''''''
+Over time as steam is evaporated from the boiler a concentration of impurities 
+will build up in the boiler. The boiler blowdown valve was used to remove these 
+sediments from the boiler which could impact its efficiency. Depending upon the 
+quality of the feed water used in the boiler, blowdown could be needed regularly 
+when the locomotive was in operation.
+
+.. index::
+   single: ORTS_BLOWDOWN_VALVE
+
+The blowdown valve can be operated by toggling the ``<Shft+C>`` keys onn and off. 
+Alternatively a cab control can be set up by using the ``<ORTS_BLOWDOWN_VALVE ( x, y, z )>``.
+
+A special steam effect can also be added. See the section on steam effects.
+
 Steam Locomotive Carriage Steam Heat Modelling
 ''''''''''''''''''''''''''''''''''''''''''''''
 
 Overview
 ........
+
+
+.. figure:: images/physics-steam-passenger-car.png
+    :align: right
+    :scale: 95%
+
 
 In the early days of steam, passenger carriages were heated by fire burnt
 in stoves within the carriage, but this type of heating proved to be
@@ -1140,16 +1368,12 @@ due to steam passing through it.
 As shown in the figure the heat model has a number of different elements
 as follows:
 
-.. figure:: images/physics-steam-passenger-car.png
-    :align: right
-    :scale: 95%
-
     Heat Model for Passenger Car
 
 i.   *Internal heat mass* -- the air mass in the carriage (represented
      by cloud) is heated to temperature that is comfortable to the
      passengers. The energy required to maintain the temperature will
-     be determined the volume of the air in the carriage
+     be determined the volume of the air in the carriage.
 ii.  *Heat Loss -- Transmission* -- over time heat will be lost through
      the walls, roof, and floors of the carriage (represented by
      outgoing orange arrows), this heat loss will reduce the
@@ -1164,10 +1388,17 @@ iv.  *Steam Heating* -- to offset the above heat losses, steam was piped
      would be balanced by offsetting the steam heating against the heat
      losses.
 
+
 Carriage Heating Implementation in Open Rails
 .............................................
 
-Currently, carriage steam heating is only available on steam locomotives.
+.. index::
+   single: MaxSteamHeatingPressure
+
+Steam heating can be set up on steam locomotives, or on diesels with steam 
+heating boilers, or alternatively with special cars that had steam heating 
+boilers installed in them.
+
 To enable steam heating to work in Open Rails the following parameter must
 be included in the engine section of the steam locomotive ENG File::
 
@@ -1181,10 +1412,10 @@ appear in the extended HUD to show the temperature in the train, and the
 steam heating pipe pressure, etc.
 
 Steam heating will only work if there are passenger cars attached to the
-locomotive.
+locomotive, or cars that have been set as requiring heating.
 
 Warning messages will be displayed if the temperature inside the carriage
-goes outside of the limits of 10--15.5\ |deg|\ C.
+drops below the temperature limits.
 
 The player can control the train temperature by using the following
 controls:
@@ -1192,12 +1423,77 @@ controls:
 - ``<Alt+U>`` -- increase steam pipe pressure (and hence train temperature)
 - ``<Alt+D>`` -- decrease steam pipe pressure (and hence train temperature)
 
-The steam heating control valve can be configured by adding an enginecontroller
-called ``ORTSSTeamHeat ( w, x, y, z)``. It should be configured as a standard
+.. index::
+   single: ORTSSteamHeat
+
+The steam heating control valve can be configured by adding an engine controller
+called ``ORTSSteamHeat ( w, x, y, z)``. It should be configured as a standard
 4 value controller.
+
+The primary purpose of this model is to calculate steam usage for the heating, 
+and in the case of a steam locomotive this will reduce available steam for the 
+locomotive to use. Water and fuel usage in producing the heat will also result 
+in the mass of the locomotive or steam heating van to be reduced.
 
 It should be noted that the impact of steam heating will vary depending
 upon the season, length of train, etc.
+
+A set of standard default parameters are included in Open Rails which will allow 
+steam heating to work once the above changes have been implemented.
+
+For those who would like to customise the steam heating the following parameters 
+which can be inserted in the wagon file section can be adjusted as follows.
+
+.. index::
+   single: ORTSHeatingWindowDeratingFactor
+   single: ORTSHeatingCompartmentTemperatureSet
+   single: ORTSHeatingCompartmentPipeAreaFactor
+   single: ORTSHeatingTrainPipeOuterDiameter
+   single: ORTSHeatingTrainPipeInnerDiameter
+   single: ORTSHeatingConnectingHoseOuterDiameter
+   single: ORTSHeatingConnectingHoseInnerDiameter
+
+The passenger (or other heated cars) can be adjusted with the following parameters:
+
+- ``ORTSHeatingWindowDeratingFactor`` - is the fraction of the car side that is occupied by windows.
+
+- ``ORTSHeatingCompartmentTemperatureSet`` - is the temperature that the car thermostat is set to.
+
+- ``ORTSHeatingCompartmentPipeAreaFactor`` - is a factor that adjusts the heating area of the steam heater in the passenger compartment.
+
+- ``ORTSHeatingTrainPipeOuterDiameter`` - outer diameter of the main steam pipe that runs the length of the train.
+
+- ``ORTSHeatingTrainPipeInnerDiameter`` - inner diameter of the main steam pipe that runs the length of the train.
+
+- ``ORTSHeatingConnectingHoseOuterDiameter`` - outer diameter of the connecting hose between carriages.
+
+- ``ORTSHeatingConnectingHoseInnerDiameter`` - inner diameter of the connecting hose between carriages.
+
+
+.. index::
+   single: ORTSWagonSpecialType
+   single: ORTSHeatingBoilerWaterUsage
+   single: ORTSHeatingBoilerFuelUsage
+   single: ORTSHeatingBoilerWaterTankCapacity
+   single: ORTSHeatingBoilerFuelTankCapacity
+
+For diesel locomotives or steam heating boiler vans the following parameters can be used 
+to set the parameters of the steam heating boiler:
+
+- ``ORTSWagonSpecialType`` - can be used to indicate whether the car is a boiler van (set = HeatingBoiler), or if the car is heated (set = Heated).
+
+- ``ORTSHeatingBoilerWaterUsage`` - is the water usage for the steam heating boiler, and is a table with a series of x and y parameters, where x = steam usage (lb/hr) and y = water usage (g-uk/hr).
+
+- ``ORTSHeatingBoilerFuelUsage`` - is the fuel usage for the steam heating boiler, and is a table with a series of x and y parameters, where x = steam usage (lb/hr) and y = fuel usage (g-uk/hr).
+
+- ``ORTSHeatingBoilerWaterTankCapacity`` - is the feed water tank capacity for the steam boiler.
+
+- ``ORTSHeatingBoilerFuelTankCapacity`` - is the fuel tank capacity for the steam boiler. Applies to steam heating boiler cars only. 
+
+
+Special effects can also be added to support the steam heating model, see the section 
+:ref:`Special Visual Effects for Locomotives or Wagons <visual-effects>` for more information.
+
 
 Steam Locomotives -- Physics Parameters for Optimal Operation
 -------------------------------------------------------------
@@ -1243,6 +1539,49 @@ ii.  `Example Wiki Locomotive Data
      <http://en.wikipedia.org/wiki/SR_Merchant_Navy_class>`_
 iii. `Testing Resources for Open Rails Steam Locomotives
      <http://coalstonewcastle.com.au/physics/>`_
+
+.. index::
+   single: ORTSSteamLocomotiveType
+   single: WheelRadius
+   single: MaxSteamHeatingPressure
+   single: ORTSSteamBoilerType
+   single: BoilerVolume
+   single: ORTSEvaporationArea
+   single: MaxBoilerPressure
+   single: ORTSSuperheatArea
+   single: MaxTenderWaterMass 
+   single: MaxTenderCoalMass
+   single: IsTenderRequired
+   single: ORTSGrateArea
+   single: ORTSFuelCalorific
+   single: ORTSSteamFiremanMaxPossibleFiringRate
+   single: SteamFiremanIsMechanicalStoker
+   single: NumCylinder
+   single: CylinderStroke
+   single: CylinderDiameter
+   single: LPNumCylinders
+   single: LPCylinderStroke
+   single: LPCylinderDiameter
+   single: ORTSDavis_A
+   single: ORTSDavis_B
+   single: ORTSDavis_C
+   single: ORTSBearingType
+   single: ORTSDriveWheelWeight
+   single: ORTSUnbalancedSuperElevation
+   single: ORTSTrackGauge
+   single: CentreOfGravity 
+   single: ORTSRigidWheelBase
+   single: ORTSSteamGearRatio
+   single: ORTSSteamMaxGearPistonRate
+   single: ORTSGearedTractiveEffortFactor
+   single: ORTSBoilerEvaporationRate
+   single: ORTSBurnRate
+   single: ORTSCylinderEfficiencyRate
+   single: ORTSBoilerEfficiency
+   single: ORTSCylinderExhaustOpen
+   single: ORTSCylinderInitialPressure
+   single: ORTSCylinderPortOpening
+   single: ORTSCylinderBackPressure
 
 .. |-| unicode:: U+00AD .. soft hyphen
   :trim:
@@ -1369,7 +1708,7 @@ iii. `Testing Resources for Open Rails Steam Locomotives
 |                                                           |Deficiency applied |unknown            |                   |
 |                                                           |to carriage        |                   |                   |
 +-----------------------------------------------------------+-------------------+-------------------+-------------------+
-|ORTS |-| Track |-| Gauge( x )                              |Track gauge        |Distance,          || (4ft 8.5in)      |
+|ORTS |-| Track |-| Gauge ( x )                             |Track gauge        |Distance,          || (4ft 8.5in)      |
 |                                                           |                   |Leave out if       || ( 1.435m )       |
 |                                                           |                   |unknown            || ( 4.708ft)       |
 +-----------------------------------------------------------+-------------------+-------------------+-------------------+
@@ -1392,6 +1731,9 @@ iii. `Testing Resources for Open Rails Steam Locomotives
 +-----------------------------------------------------------+-------------------+-------------------+-------------------+
 |ORTS |-| Steam |-| Gear |-| Type ( x )                     |Fixed gearing or   |Fixed,             || (Fixed)          |
 |                                                           |selectable gearing |Select             || (Select)         |
++-----------------------------------------------------------+-------------------+-------------------+-------------------+
+|ORTS |-| Geared |-| Tractive |-| Effort |-| Factor ( x )   |Factor to include  |Fixed              || (Fixed)          |
+|                                                           | in TE calculation |                   ||                  |
 +-----------------------------------------------------------+-------------------+-------------------+-------------------+
 |**Locomotive Performance Adjustments (Engine section -- Optional, for experienced modellers)**                         |
 +-----------------------------------------------------------+-------------------+-------------------+-------------------+
@@ -1442,8 +1784,10 @@ iii. `Testing Resources for Open Rails Steam Locomotives
 |                                                           |                   |unused             |                   |
 +-----------------------------------------------------------+-------------------+-------------------+-------------------+
 
-Special Visual Effects for Locomotives or Wagons
-------------------------------------------------
+.. _visual-effects:
+
+`Special Visual Effects for Locomotives or Wagons`
+--------------------------------------------------
 Steam exhausts on a steam locomotive, and other special visual effects can be modelled in OR by defining
 appropriate visual effects in the ``SteamSpecialEffects`` section of the steam locomotive ENG file, the
 ``DieselSpecialEffects`` section of the diesel locomotive ENG file, or the ``SpecialEffects`` section
@@ -1476,6 +1820,8 @@ OR supports the following special visual effects in a steam locomotive:
 - Injectors (named ``Injectors1FX`` and ``Injectors2FX``) -- represents the
   steam discharge from the steam overflow pipe of the injectors. They will
   appear whenever the respective injectors operate.
+- Boiler blowdown valves (named ``BlowdownFX``) -- represents the discharge of the
+  steam boiler blowdown valve. It will appear whenever the blowdown valve operates.
 
 OR supports the following special visual effects in a diesel locomotive:
 
@@ -1494,11 +1840,13 @@ an ENG file):
   This generator was used to provide additional auxiliary power for the train, and
   could have been used for air conditioning, heating lighting, etc.
 
-- Wagon Smoke (named ``WagonSmokeFX``) -- represents the smoke coming from say a
-  wood fire. This might have been a heating unit located in the guards van of the train.
+- Wagon Smoke (named ``WagonSmokeFX``) -- represents the smoke coming from say a wood fire. This might have been a heating unit located in the guards van of the train.
 
-- Heating Hose (named ``HeatingHoseFX``) -- represents the steam escaping from a
-  steam pipe connection between wagons.
+- Heating Hose (named ``HeatingHoseFX``) -- represents the steam escaping from a steam pipe connection between wagons.
+
+- Heating Compartment Steam Trap (named ``HeatingCompartmentSteamTrapFX``) -- represents the steam escaping from the steam trap under a passenger compartment.
+
+- Heating Main Pipe Steam Trap (named ``HeatingMainPipeSteamTrapFX``) -- represents the steam escaping from a steam trap in the main steam pipe running under the passenger car.
 
 NB: If a steam effect is not defined in the ``SteamSpecialEffects``,  ``DieselSpecialEffects``, or the
 ``SpecialEffects`` section of an ENG/WAG file, then it will not be displayed  in the simulation.
@@ -1529,6 +1877,9 @@ To increase the water carrying capacity of a steam locomotive, an *auxiliary ten
 Typically, if the connecting pipes were opened between the locomotive tender and the auxiliary tender, the water level in the two vehicles would equalise at the same height.
 
 To implement this feature in Open Rails, a suitable water carrying vehicle needs to have the following parameter included in the WAG file.
+
+.. index::
+   single: ORTSAuxTenderWaterMass
 
 ``ORTSAuxTenderWaterMass ( 70000lb )`` The units of measure are in mass.
 
@@ -1669,6 +2020,9 @@ Open Rails models the aspects described above, and operates within one of the fo
 It should be noted that the MaxBrakeForce parameter in the WAG file is the actual force applied to the wheel after reduction by the friction coefficient.
 
 Option iii) above is the ideal recommended method of operating, and naturally will require include files, or variations to the WAG file.
+
+.. index::
+   single: ORTSBrakeShoeFriction
 
 To setup the WAG file, the following values need to be set:
 
@@ -1874,7 +2228,17 @@ The default values are used in place of MSTS braking parameters; however,
 two MSTS parameters are used for the release state:
 MaxAuxilaryChargingRate and EmergencyResChargingRate.
 
-- ``wagon(brakepipevolume`` -- Volume of car's brake pipe in cubic feet
+.. index::
+   single: BrakePipeVolume
+   single: ORTSMainResChargingRate
+   single: ORTSEngineBrakeReleaseRate
+   single: ORTSEngineBrakeApplicationRate
+   single: ORTSBrakePipeChargingRate
+   single: ORTSBrakeServiceTimeFactor
+   single: ORTSBrakeEmergencyTimeFactor
+   single: ORTSBrakePipeTimeFactor
+
+- ``Wagon(BrakePipeVolume`` -- Volume of car's brake pipe in cubic feet
   (default .5).
   This is dependent on the train length calculated from the ENG to the
   last car in the train. This aggregate factor is used to approximate the
@@ -1886,22 +2250,22 @@ MaxAuxilaryChargingRate and EmergencyResChargingRate.
   brake servicetimefactor instead, but the Open Rails Development team
   doesn't believe this is worth the effort by the user for the added
   realism.
-- ``engine(mainreschargingrate`` -- Rate of main reservoir pressure change
+- ``Engine(ORTSMainResChargingRate`` -- Rate of main reservoir pressure change
   in psi per second when the compressor is on (default .4).
-- ``engine(enginebrakereleaserate`` -- Rate of engine brake pressure
+- ``Engine(ORTSEngineBrakeReleaseRate`` -- Rate of engine brake pressure
   decrease in psi per second
   (default 12.5).
-- ``engine(enginebrakeapplicationrate`` -- Rate of engine brake pressure
+- ``Engine(ORTSEngineBrakeApplicationRate`` -- Rate of engine brake pressure
   increase in psi per second
   (default 12.5).
-- ``engine(brakepipechargingrate`` -- Rate of lead engine brake pipe
+- ``Engine(ORTSBrakePipeChargingRate`` -- Rate of lead engine brake pipe
   pressure increase in PSI per second (default 21).
-- ``engine(brakeservicetimefactor`` -- Time in seconds for lead engine
+- ``Engine(ORTSBrakeServiceTimeFactor`` -- Time in seconds for lead engine
   brake pipe pressure to drop to about 1/3 for service application
   (default 1.009).
-- ``engine(brakeemergencytimefactor`` -- Time in seconds for lead engine
+- ``Engine(ORTSBrakeEmergencyTimeFactor`` -- Time in seconds for lead engine
   brake pipe pressure to drop to about 1/3 in emergency (default .1).
-- ``engine(brakepipetimefactor`` -- Time in seconds for a difference in
+- ``Engine(ORTSBrakePipeTimeFactor`` -- Time in seconds for a difference in
   pipe pressure between adjacent cars to equalize to about 1/3
   (default .003).
 
@@ -1986,6 +2350,17 @@ Following is a list of specific OR parameters and their default values. The defa
 values can be overwritten by including the following parameters into the relevant
 wagon section of the WAG or ENG file.
 
+.. index::
+   single: ORTSAuxilaryResCapacity
+   single: ORTSBrakeCylinderSize
+   single: ORTSNumberBrakeCylinders
+   single: ORTSDirectAdmissionValve
+   single: ORTSBrakeShoeFriction
+   single: MaxBrakeForce
+   single: MaxReleaseRate
+   single: MaxApplicationRate
+   single: BrakeCylinderPressureForMaxBrakeBrakeForce
+
 - ``wagon(BrakePipeVolume`` -- Volume of brake pipe fitted to car in cubic feet
   (default calculated from car length, and assumption of 2in BP).
 - ``wagon(ORTSAuxilaryResCapacity`` -- Volume of auxiliary vacuum reservoir
@@ -1999,12 +2374,22 @@ wagon section of the WAG or ENG file.
 - ``wagon(ORTSBrakeShoeFriction`` -- defines the friction curve for the brake shoe
   with speed (default curve for cast iron brake shoes included in OR).
 
-Other standard brake parameters such as MaxBrakeForce, MaxReleaseRate , MaxApplicationRate,
-BrakeCylinderPressureForMaxBrakeBrakeForce can be used as well.
+Other standard brake parameters such as ``MaxBrakeForce``, ``MaxReleaseRate``, ``MaxApplicationRate``,
+``BrakeCylinderPressureForMaxBrakeBrakeForce`` can be used as well.
+
+.. index::
+   single: BrakeCylinderPressureForMaxBrakeBrakeForce
+   single: ORTSBrakeEmergencyTimeFactor
+   single: ORTSBrakePipeTimeFactor
+   single: TrainPipeLeakRate
+   single: ORTSVacuumBrakesMainResVolume
+   single: ORTSVacuumBrakesMainResMaxVacuum
+   single: ORTSVacuumBrakesExhausterRestartVacuum
+   single: ORTSVacuumBrakesMainResChargingRate
 
 Additionaly the following are defined in the engine section of the ENG file:
 
-- ``engine(ORTSBrakePipeChargingRate`` -- sets the rate at which the brake pipe charges in InHg per second
+- ``engine(BrakeCylinderPressureForMaxBrakeBrakeForce`` -- sets the rate at which the brake pipe charges in InHg per second
   (default 0.32) This value should be calculated on the basis of feeding into a 200ft^3 brake system,
   as OR will adjust the value depending upon the connected volume of the brake cylinders and brake pipe.
 
@@ -2033,27 +2418,119 @@ Additionaly the following are defined in the engine section of the ENG file:
 
 **Note: It is strongly recommended that UoM be used whenever units such as InHg, etc are specificed in the above parameters.**
 
-Other standard brake parameters such as VacuumBrakesHasVacuumPump, VacuumBrakesMinBoilerPressureMaxVacuum,
-VacuumBrakesSmallEjectorUsageRate, VacuumBrakesLargeEjectorUsageRate can be defined as well.
+.. index::
+   single: VacuumBrakesHasVacuumPump
+   single: VacuumBrakesMinBoilerPressureMaxVacuum
+   single: VacuumBrakesSmallEjectorUsageRate
+   single: VacuumBrakesLargeEjectorUsageRate
+   single: TrainBrakesControllerFullQuickReleaseStart
+   single: TrainBrakesControllerReleaseStart
+   single: TrainBrakesControllerRunningStart
+   single: TrainBrakesControllerApplyStart
+   single: TrainBrakesControllerHoldLappedStart
+   single: TrainBrakesControllerVacuumContinuousServiceStart
+   single: TrainBrakesControllerHoldLappedStart
+   single: TrainBrakesControllerEmergencyStart
+   single: EngineBrakesControllerReleaseStart
+   single: EngineBrakesControllerRunningStart
+   single: EngineBrakesControllerApplyStart
+   single: TrainPipeLeakRate
+   single: ORTSSmallEjector
+   single: ORTSLargeEjector
+   single: ORTSFastVacuumExhauster
+
+Other standard brake parameters such as ``VacuumBrakesHasVacuumPump``, ``VacuumBrakesMinBoilerPressureMaxVacuum``,
+``VacuumBrakesSmallEjectorUsageRate``, ``VacuumBrakesLargeEjectorUsageRate`` can be defined as well.
 
 When defining the Brake Controllers for vacuum braked locomotives, only the following BrakesController
-tokens should be used - TrainBrakesControllerFullQuickReleaseStart, TrainBrakesControllerReleaseStart,
-TrainBrakesControllerRunningStart, TrainBrakesControllerApplyStart, TrainBrakesControllerHoldLappedStart,
-TrainBrakesControllerVacuumContinuousServiceStart, TrainBrakesControllerEmergencyStart,
-EngineBrakesControllerReleaseStart, EngineBrakesControllerRunningStart, EngineBrakesControllerApplyStart.
+tokens should be used - ``TrainBrakesControllerFullQuickReleaseStart``, ``TrainBrakesControllerReleaseStart``,
+``TrainBrakesControllerRunningStart``, ``TrainBrakesControllerApplyStart``, ``TrainBrakesControllerHoldLappedStart``,
+``TrainBrakesControllerVacuumContinuousServiceStart``, ``TrainBrakesControllerEmergencyStart``,
+``EngineBrakesControllerReleaseStart``, ``EngineBrakesControllerRunningStart``, ``EngineBrakesControllerApplyStart``.
 
 If ``TrainPipeLeakRate`` has been set in the ENG file, then the small ejector will be required to offset the leakage
-in the Brake Pipe. The *J* and *Shft-J* keys can be used to increase the level of operation of the small ejector.
+in the Brake Pipe. The *J* and *Shft-J* keys can be used to increase/decrease the level of operation of the small ejector.
 
 An engine controller can be configured to customise the operation of the small ejector. This controller is called
 ``ORTSSmallEjector ( w, x, y, z )``, and will be set up as a standard 4 value controller.
 
-Engine brakes can also be configured for locomotives as required. They will work in a similar fashion to those fitted to air braked locomotives.
+An engine controller can also be configured to customise the operation of the large ejector. This controller is called
+``ORTSLargeEjector ( w, x, y, z )``, and will be set up as a standard 4 value controller. The large ejector needs to 
+be operated to release the brakes. The *Alt-J* and *Ctrl-J* keys can be used to decrease/increase the level of 
+operation of the large ejector.
 
+In diesel and electric locomotives, the Vacuum Exhauster preforms a similar function to the small and large ejector, 
+but in an "automated" fashion. The *J* key can be used to run the vacuum exhauster at high speed to facilitate a 
+quicker release of the brakes. An engine controller called ``ORTSFastVacuumExhauster ( x y z )``, and will be set 
+up as a standard 3 value controller.
 
+If it is not desired to operate the large ejector, a simplified brake operation can be used by selecting the 
+"Simple Contol and Physics" option in the options menu (Simulator TAB). This option can also be used if there is a 
+"mismatch" between the locomotive and car brakes to set a standard default set of brakes.
+
+Engine brakes can also be configured for locomotives as required. They will work in a similar fashion to those fitted 
+to air braked locomotives.
+
+.. _physics-manual:
+
+Manual Brakes
+-------------
+
+Manual braking is provided in OR to facilitate cars with no brakes fitted (for example Stephenson's Rocket locomotive 
+initially had no brakes fitted). Alternatively some trains used manually operated brakes controlled by a brakeman. 
+This feature allows for the creation of braking on selected cars along the train that are operated by a brakeman (for 
+example some trains had brakes only on the locomotive and the brakevans (caboose) which would be operated to control the 
+stopping of the train.
+
+An additional engine controller has been added to facilitate the operation of all brakeman (manual braked) controlled cars.
+
+.. index::
+   single: TrainBrakesControllerManualBrakingStart
+   single: BrakeSystemType
+   single: BrakeEquipmentType
+   single: MaxBrakeForce
+   single: MaxReleaseRate
+   single: MaxApplicationRate
+
+The controller can be added to an ENG file in a similar fashion to an air brake or vacuum controller by using the following 
+brake controller parameter: ``TrainBrakesControllerManualBrakingStart``
+
+To configure a car with manual braking then in the car brake section configure the fllowing two parameters:
+
+``BrakeSystemType ( "Manual_Braking" )``
+``BrakeEquipmentType( "Manual_brake, Handbrake" )``
+
+If the BrakeEquipmentType is left out, OR will assume that no braking is fitted to the car.
+
+The following values, in the wagon section of the file need to be set for a manually braked car:
+
+- ``MaxBrakeForce``
+- ``MaxReleaseRate``
+- ``MaxApplicationRate``
+
+The manual brake can be increased by pressing Alt+], and decreased by pressing Alt+[.
+
+Steam Brakes
+------------
+
+Steam brakes can be applied to a locomotive, and its corresponding tender, by adding the following parameter to the ENG file:
+
+``BrakesEngineBrakeType ( "Steam_brake" )``
+
+The brake can be applied by pressing ], and released by pressing the [ keys.
+
+To control the application and release rates on the brake use the ``EngineBrakesControllerMaxApplicationRate`` and 
+``EngineBrakesControllerMaxReleaseRate`` parameters.
+
+The ``SteamBrakeFX`` special effect, if added to the wagon, will turn on and off with the brake operation 
+and can be used to model steam leakage of the steam brake cylinder, etc.
 
 Dynamically Evolving Tractive Force
 ===================================
+
+.. index::
+   single: ORTSMaxTractiveForceCurves
+   single: ORTSContinuousForceTimeFactor
 
 The Open Rails development team has been experimenting with
 max/continuous tractive force, where it can be dynamically altered during
@@ -2182,7 +2659,10 @@ Where:
 - R = Curve resistance,
 - W = vehicle weight,
 - F = Coefficient of Friction,
-- |mgr| = 0.5 for dry, smooth steel-to-steel; wet rail 0.1 -- 0.3,
+
+  - 0.1 -- 0.3 for wet rail
+  - 0.5 for dry, smooth steel-to-steel 
+
 - D = track gauge,
 - L = Rigid wheelbase,
 - r = curve radius.
@@ -2229,6 +2709,10 @@ change in curve resistance as the speed, curve radius, etc. vary.
 
 OR Parameter Values
 -------------------
+
+.. index::
+   single: ORTSRigidWheelBase
+   single: ORTSTrackGauge
 
 Typical OR parameter values may be entered in the Wagon section of the .wag
 or .eng file, and are formatted as below.::
@@ -2564,6 +3048,10 @@ in the above formula.
 OR Super Elevation Parameters
 -----------------------------
 
+.. index::
+   single: ORTSUnbalancedSuperElevation
+   single: ORTSTrackGauge
+
 Typical OR parameters can be entered in the Wagon section of the .wag or
 .eng file, and are formatted as below. ::
 
@@ -2699,7 +3187,7 @@ where
 +-----------------------------------------------------------+-----------------------------------------------------------+
 |F\ :sub:`t` -- tunnel cross-sectional area (m\ :sup:`2`\ ) |F\ :sub:`tr` -- train cross-sectional area (m\ :sup:`2`\ ) |
 +-----------------------------------------------------------+-----------------------------------------------------------+
-||rgr| -- density of air ( = 1.2 kg/m\ :sup:`3`\ )          |R\ :sub:`t` -- tunnel perimeter (m)                        |
+|:math:`\rho` -- density of air ( = 1.2 kg/m\ :sup:`3`\ )   |R\ :sub:`t` -- tunnel perimeter (m)                        |
 +-----------------------------------------------------------+-----------------------------------------------------------+
 |L\ :sub:`tr` -- length of train (m)                        |L\ :sub:`t` -- length of tunnel (m)                        |
 +-----------------------------------------------------------+-----------------------------------------------------------+
@@ -2730,6 +3218,12 @@ TRK file.
 
 OR Parameters
 -------------
+
+.. index::
+   single: ORTSSingleTunnelArea
+   single: ORTSSingleTunnelPerimeter
+   single: ORTSDoubleTunnelArea
+   single: ORTSDoubleTunnelPerimeter
 
 The following parameters maybe included in the TRK file to overwrite
 standard default values used by Open Rails:
@@ -2835,6 +3329,10 @@ the stock from the Size statement, so by default it is not necessary to add any 
 parameters for its operation. However for those who like to customise, the following
 parameters can be inputted via the WAG file or section.
 
+.. index::
+   single: ORTSWagonFrontalArea
+   single: ORTSDavisDragConstant
+
 ``ORTSWagonFrontalArea`` -- The frontal cross sectional area of the wagon. The default units
 are in ft^2, so if entering metres, include the Units of Measure.
 
@@ -2855,6 +3353,9 @@ OR automatically adjusts the Drag resistance for trailing locomotives based upon
 Davis formula.
 
 However for those who like to customise, the following parameter can be inputted via the WAG file or section.
+
+.. index::
+   single: ORTSTrailLocomotiveResistanceFactor
 
 ``ORTSTrailLocomotiveResistanceFactor`` -- The constant value by which the leading locomotive resistance
 needs to be decreased for trailing operation.
@@ -2983,6 +3484,9 @@ OpenRails subfolder that uses the second possibility is as follows::
 
 Take into account that the first line must be blank (before the include line).
 
+.. index::
+   single: ORTSMaxTractiveForceCurves
+
 The ``ORTSMaxTractiveForceCurves`` are formed by blocks of pairs of parameters
 representing speed in metres per second and tractive force in Newtons;
 these blocks are each related to the value of the throttle setting present
@@ -3018,6 +3522,12 @@ The Train Control System is a system that ensures the safety of the train.
 In MSTS, 4 TCS monitors were defined: the vigilance monitor, the overspeed
 monitor, the emergency stop monitor and the AWS monitor. Open Rails does
 not support the AWS monitor.
+
+.. index::
+   single: VigilanceMonitor
+   single: OverspeedMonitor
+   single: EmergencyStopMonitor
+   single: AWSMonitor
 
 In order to define the behavior of the monitors, you must add a group of
 parameters for each monitor in the Engine section of the .eng file. These
@@ -3080,6 +3590,10 @@ the tables below.
 +--------------------------------------------------+-----------------------------------+---------------+-------------------+
 |MonitoringDeviceTriggerOnTrackOverspeedMargin( x )|Allowed overspeed                  |Speed          |``(5kph)``         |
 +--------------------------------------------------+-----------------------------------+---------------+-------------------+
+
+.. index::
+   single: DoesBrakeCutPower
+   single: BrakeCutsPowerAtBrakeCylinderPressure
 
 Two other parameters in the Engine section of the ENG file are used by the TCS:
 

@@ -285,6 +285,11 @@ namespace Orts.Simulation.RollingStocks.SubSystems.Brakes.MSTS
             // reducing size of Emergency Reservoir for short (fake) cars
             if (Car.Simulator.Settings.CorrectQuestionableBrakingParams && Car.CarLengthM <= 1)
             EmergResVolumeM3 = Math.Min (0.02f, EmergResVolumeM3);
+
+            // In simple brake mode set emergency reservoir volume, override high volume values to allow faster brake release.
+            if (Car.Simulator.Settings.SimpleControlPhysics && EmergResVolumeM3 > 2.0)
+                EmergResVolumeM3 = 0.7f;
+
             BrakeLine1PressurePSI = Car.Train.EqualReservoirPressurePSIorInHg;
             BrakeLine2PressurePSI = Car.Train.BrakeLine2PressurePSI;
             BrakeLine3PressurePSI = 0;
@@ -480,20 +485,21 @@ namespace Orts.Simulation.RollingStocks.SubSystems.Brakes.MSTS
             else
                 CylPressurePSI = AutoCylPressurePSI;
 
-          // Record HUD display values for brake cylinders depending upon whether they are wagons or locomotives/tenders (which are subject to their own engine brakes)   
+            // Record HUD display values for brake cylinders depending upon whether they are wagons or locomotives/tenders (which are subject to their own engine brakes)   
             if (Car.WagonType == MSTSWagon.WagonTypes.Engine || Car.WagonType == MSTSWagon.WagonTypes.Tender)
             {
-                 Car.Train.HUDLocomotiveBrakeCylinderPSI = CylPressurePSI;
+                Car.Train.HUDLocomotiveBrakeCylinderPSI = CylPressurePSI;
+                Car.Train.HUDWagonBrakeCylinderPSI = Car.Train.HUDLocomotiveBrakeCylinderPSI;  // Initially set Wagon value same as locomotive, will be overwritten if a wagon is attached
             }
             else
             {
-               // Record the Brake Cylinder pressure in first wagon, as EOT is also captured elsewhere, and this will provide the two extremeties of the train
-               // Identifies the first wagon based upon the previously identified UiD 
+                // Record the Brake Cylinder pressure in first wagon, as EOT is also captured elsewhere, and this will provide the two extremeties of the train
+                // Identifies the first wagon based upon the previously identified UiD 
                 if (Car.UiD == Car.Train.FirstCarUiD)
-               {
-                   Car.Train.HUDWagonBrakeCylinderPSI = CylPressurePSI;
-               }
-                
+                {
+                    Car.Train.HUDWagonBrakeCylinderPSI = CylPressurePSI;
+                }
+
             }
 
             // If wagons are not attached to the locomotive, then set wagon BC pressure to same as locomotive in the Train brake line
