@@ -23,8 +23,6 @@ using System.Linq;
 using System.Text;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using Color = Microsoft.Xna.Framework.Color;
-using MessageBox = System.Windows.Forms.MessageBox;
 
 using System.Windows.Forms;
 using System.Reflection;
@@ -157,8 +155,8 @@ namespace ORTS.TrackViewer
             SetAliasing();
             graphics.IsFullScreen = false;
             Window.AllowUserResizing = true;
-            Window.ClientSizeChanged += new System.EventHandler<EventArgs>(Window_ClientSizeChanged);
-        
+            Window.ClientSizeChanged += new System.EventHandler<System.EventArgs>(Window_ClientSizeChanged);
+
             //we do not a very fast behaviour, but we do need to get all key presses
             IsFixedTimeStep = true;
             TargetElapsedTime = TimeSpan.FromSeconds(0.05);
@@ -638,9 +636,8 @@ namespace ORTS.TrackViewer
         {
             ScreenW = Window.ClientBounds.Width;
             ScreenH = Window.ClientBounds.Height;
-            // if something went wrong during fast window switching, let's not continue
-            if (menuControl == null || statusBarControl == null || ScreenW == 0 || ScreenH == 0)
-            {
+            if (ScreenW == 0 || ScreenH == 0)
+            {   // if something went wrong during fast window switching, let's not continue
                 return;
             }
             SetSubwindowSizes();
@@ -1136,8 +1133,8 @@ namespace ORTS.TrackViewer
 
         void CalculateFPS(GameTime gameTime)
         {
-            float elapsedRealTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
-            FrameRate.Update(elapsedRealTime, 1f / elapsedRealTime);
+            float elapsedTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
+            FrameRate.Update(elapsedTime, 1f / elapsedTime);
         }
 
         #endregion

@@ -121,12 +121,12 @@ VERTEX_OUTPUT VSParticles(in VERTEX_INPUT In)
 	In.StartPosition_StartTime.xyz += up * vertOffset.y;
 	
 	Out.Position = mul(float4(In.StartPosition_StartTime.xyz, 1), worldViewProjection);
-
+	
 	Out.TexCoord = texCoords[vertIdx];
-	float texAtlasPosition = In.TileXY_Vertex_ID.w;
-    float atlasY = (int) (texAtlasPosition / 4.0f);
-    float atlasX = (int) (texAtlasPosition - (atlasY * 4.0f));
-    Out.TexCoord += float2(0.25f * atlasX, 0.25f * atlasY);
+	int texAtlasPosition = In.TileXY_Vertex_ID.w;
+	int atlasX = texAtlasPosition % 4;
+	int atlasY = texAtlasPosition / 4;
+	Out.TexCoord += float2(0.25f * atlasX, 0.25f * atlasY);
 
 	Out.Color_Age.rgb = In.Color_Random.rgb;
 

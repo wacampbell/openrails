@@ -1,4 +1,4 @@
-﻿// COPYRIGHT 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017 by the Open Rails project.
+// COPYRIGHT 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017 by the Open Rails project.
 //
 // This file is part of Open Rails.
 //
@@ -41,6 +41,7 @@ using Orts.Viewer3D.Processes;
 using Orts.Viewer3D.RollingStock;
 using ORTS.Common;
 using ORTS.Common.Input;
+using ORTS.Scripting.Api;
 using ORTS.Settings;
 using Event = Orts.Common.Event;
 
@@ -105,7 +106,14 @@ namespace Orts.Viewer3D
         // Cameras
         public Camera Camera { get; set; } // Current camera
         public Camera AbovegroundCamera { get; private set; } // Previous camera for when automatically switching to cab.
-        public CabCamera CabCamera { get; private set; } // Camera 1
+        /// <summary>
+        /// Camera #1, 2D cab. Swaps with <see cref="ThreeDimCabCamera"/> with Alt+1.
+        /// </summary>
+        private readonly CabCamera CabCamera;
+        /// <summary>
+        /// Camera #1, 3D cab. Swaps with <see cref="CabCamera"/> with Alt+1.
+        /// </summary>
+        private readonly ThreeDimCabCamera ThreeDimCabCamera;
         public HeadOutCamera HeadOutForwardCamera { get; private set; } // Camera 1+Up
         public HeadOutCamera HeadOutBackCamera { get; private set; } // Camera 2+Down
         public TrackingCamera FrontCamera { get; private set; } // Camera 2
@@ -116,7 +124,27 @@ namespace Orts.Viewer3D
         public BrakemanCamera BrakemanCamera { get; private set; } // Camera 6
         public List<FreeRoamCamera> FreeRoamCameraList = new List<FreeRoamCamera>();
         public FreeRoamCamera FreeRoamCamera { get { return FreeRoamCameraList[0]; } } // Camera 8
-        public ThreeDimCabCamera ThreeDimCabCamera; //Camera 0
+
+        /// <summary>
+        /// Activate the 2D or 3D cab camera depending on the current player preference.
+        /// </summary>
+        public void ActivateCabCamera()
+        {
+            if (Settings.Use3DCab && ThreeDimCabCamera.IsAvailable)
+                ThreeDimCabCamera.Activate();
+            else
+                CabCamera.Activate();
+        }
+
+        /// <summary>
+        /// Toggle the 2D/3D cab preference and, if already in the cab camera, switch modes.
+        /// </summary>
+        public void ToggleCabCameraView()
+        {
+            Settings.Use3DCab = !Settings.Use3DCab;
+            if (Camera == CabCamera || Camera == ThreeDimCabCamera)
+                ActivateCabCamera();
+        }
 
         List<Camera> WellKnownCameras; // Providing Camera save functionality by GeorgeS
 
@@ -169,9 +197,10 @@ namespace Orts.Viewer3D
 
         // MSTS cab views are images with aspect ratio 4:3.
         // OR can use cab views with other aspect ratios where these are available.
-        // On screen with other aspect ratios (e.g. 16:9), two approaches are possible:
+        // On screen with other aspect ratios (e.g. 16:9), three approaches are possible:
         //   1) stretch the width to fit the screen. This gives flattened controls, most noticeable with round dials.
         //   2) clip the image losing a slice off top and bottom.
+        //   3) letterbox the image by drawing black bars in the unfilled spaces.
         // Setting.Cab2DStretch controls the amount of stretch and clip. 0 is entirely clipped and 100 is entirely stretched.
         // No difference is seen on screens with 4:3 aspect ratio.
         // This adjustment assumes that the cab view is 4:3. Where the cab view matches the aspect ratio of the screen, use an adjustment of 100.
@@ -181,6 +210,8 @@ namespace Orts.Viewer3D
         public int CabXOffsetPixels { get; set; }
         public int CabExceedsDisplay; // difference between cabview texture vertical resolution and display vertical resolution
         public int CabExceedsDisplayHorizontally; // difference between cabview texture horizontal resolution and display vertical resolution
+        public int CabYLetterboxPixels { get; set; } // offset the cab when drawing it if it is smaller than the display; both coordinates should always be >= 0
+        public int CabXLetterboxPixels { get; set; }
         public float CabTextureInverseRatio = 0.75f; // default of inverse of cab texture ratio 
 
         public CommandLog Log { get { return Simulator.Log; } }
@@ -386,6 +417,7 @@ namespace Orts.Viewer3D
 
             if (PlayerLocomotive == null) PlayerLocomotive = Simulator.InitialPlayerLocomotive();
             SelectedTrain = PlayerTrain;
+            PlayerTrain.InitializePlayerTrainData();
             if (PlayerTrain.TrainType == Train.TRAINTYPE.AI_PLAYERHOSTING)
             {
                 Simulator.Trains[0].LeadLocomotive = null;
@@ -396,7 +428,7 @@ namespace Orts.Viewer3D
 
             TextureManager = new SharedTextureManager(this, GraphicsDevice);
 
-            AdjustCabHeight(DisplaySize.X, DisplaySize.Y);
+            AdjustCabHeight(DisplaySize.X, DisplaySize.Y); // needs TextureManager
 
             MaterialManager = new SharedMaterialManager(this);
             ShapeManager = new SharedShapeManager(this);
@@ -435,9 +467,10 @@ namespace Orts.Viewer3D
             };
             Simulator.Confirmer.DisplayMessage += (s, e) => MessagesWindow.AddMessage(e.Key, e.Text, e.Duration);
 
-            if (Simulator.PlayerLocomotive.HasFront3DCab || Simulator.PlayerLocomotive.HasRear3DCab) ThreeDimCabCamera.Activate();
-            else if (Simulator.PlayerLocomotive.HasFrontCab || Simulator.PlayerLocomotive.HasRearCab) CabCamera.Activate();
-            else CameraActivate();
+            if (CabCamera.IsAvailable || ThreeDimCabCamera.IsAvailable)
+                ActivateCabCamera();
+            else
+                CameraActivate();
 
             // Prepare the world to be loaded and then load it from the correct thread for debugging/tracing purposes.
             // This ensures that a) we have all the required objects loaded when the 3D view first appears and b) that
@@ -469,6 +502,7 @@ namespace Orts.Viewer3D
             ContinuousThrottleCommand.Receiver = (MSTSLocomotive)PlayerLocomotive;
             TrainBrakeCommand.Receiver = (MSTSLocomotive)PlayerLocomotive;
             EngineBrakeCommand.Receiver = (MSTSLocomotive)PlayerLocomotive;
+            BrakemanBrakeCommand.Receiver = (MSTSLocomotive)PlayerLocomotive;
             DynamicBrakeCommand.Receiver = (MSTSLocomotive)PlayerLocomotive;
             InitializeBrakesCommand.Receiver = PlayerLocomotive.Train;
             EmergencyPushButtonCommand.Receiver = (MSTSLocomotive)PlayerLocomotive;
@@ -476,12 +510,15 @@ namespace Orts.Viewer3D
             BailOffCommand.Receiver = (MSTSLocomotive)PlayerLocomotive;
             RetainersCommand.Receiver = (MSTSLocomotive)PlayerLocomotive;
             BrakeHoseConnectCommand.Receiver = (MSTSLocomotive)PlayerLocomotive;
+            ToggleWaterScoopCommand.Receiver = (MSTSLocomotive)PlayerLocomotive;
             if (PlayerLocomotive is MSTSSteamLocomotive)
             {
                 ContinuousReverserCommand.Receiver = (MSTSSteamLocomotive)PlayerLocomotive;
                 ContinuousInjectorCommand.Receiver = (MSTSSteamLocomotive)PlayerLocomotive;
                 ContinuousSmallEjectorCommand.Receiver = (MSTSSteamLocomotive)PlayerLocomotive;
+                ContinuousLargeEjectorCommand.Receiver = (MSTSSteamLocomotive)PlayerLocomotive;
                 ToggleInjectorCommand.Receiver = (MSTSSteamLocomotive)PlayerLocomotive;
+                ToggleBlowdownValveCommand.Receiver = (MSTSSteamLocomotive)PlayerLocomotive;
                 ContinuousBlowerCommand.Receiver = (MSTSSteamLocomotive)PlayerLocomotive;
                 ContinuousDamperCommand.Receiver = (MSTSSteamLocomotive)PlayerLocomotive;
                 ContinuousFiringRateCommand.Receiver = (MSTSSteamLocomotive)PlayerLocomotive;
@@ -506,6 +543,7 @@ namespace Orts.Viewer3D
             if (PlayerLocomotive is MSTSDieselLocomotive)
             {
                 TogglePlayerEngineCommand.Receiver = (MSTSDieselLocomotive)PlayerLocomotive;
+                VacuumExhausterCommand.Receiver = (MSTSDieselLocomotive)PlayerLocomotive;
             }
 
             ImmediateRefillCommand.Receiver = (MSTSLocomotiveViewer)PlayerLocomotiveViewer;
@@ -534,6 +572,8 @@ namespace Orts.Viewer3D
             UseCameraCommand.Receiver = this;
             MoveCameraCommand.Receiver = this;
             ToggleHelpersEngineCommand.Receiver = (MSTSLocomotive)PlayerLocomotive;
+            TCSButtonCommand.Receiver = ((MSTSLocomotive)PlayerLocomotive).TrainControlSystem;
+            TCSSwitchCommand.Receiver = ((MSTSLocomotive)PlayerLocomotive).TrainControlSystem;
         }
 
         public void ChangeToPreviousFreeRoamCamera()
@@ -614,28 +654,41 @@ namespace Orts.Viewer3D
             }
             int unstretchedCabHeightPixels = (int)(CabTextureInverseRatio * windowWidth);
             int unstretchedCabWidthPixels = (int)(windowHeight / CabTextureInverseRatio);
-            if (((float)windowHeight / windowWidth) < CabTextureInverseRatio)
+            float windowInverseRatio = (float)windowHeight / windowWidth;
+            if (Settings.Letterbox2DCab)
             {
-                // screen is wide-screen, so can choose between vertical scroll or horizontal stretch
-                CabExceedsDisplay = (int)((unstretchedCabHeightPixels - windowHeight) * ((100 - Settings.Cab2DStretch) / 100f));
-                CabExceedsDisplayHorizontally = 0;
-            }
-            else if (((float)windowHeight / windowWidth) > CabTextureInverseRatio)
-            {
-                // must scroll horizontally
-                CabExceedsDisplay = 0;
-                CabExceedsDisplayHorizontally = unstretchedCabWidthPixels - windowWidth;
+                CabWidthPixels = Math.Min((int)Math.Round(windowHeight / CabTextureInverseRatio), windowWidth);
+                CabHeightPixels = Math.Min((int)Math.Round(windowWidth * CabTextureInverseRatio), windowHeight);
+                CabXLetterboxPixels = (windowWidth - CabWidthPixels) / 2;
+                CabYLetterboxPixels = (windowHeight - CabHeightPixels) / 2;
+                CabExceedsDisplay = CabExceedsDisplayHorizontally = CabXOffsetPixels = CabYOffsetPixels = 0;
             }
             else
             {
-                // nice, window aspect ratio and cabview aspect ratio are identical
-                CabExceedsDisplay = 0;
-                CabExceedsDisplayHorizontally = 0;
+                if (windowInverseRatio == CabTextureInverseRatio)
+                {
+                    // nice, window aspect ratio and cabview aspect ratio are identical
+                    CabExceedsDisplay = 0;
+                    CabExceedsDisplayHorizontally = 0;
+                }
+                else if (windowInverseRatio < CabTextureInverseRatio)
+                {
+                    // screen is wide-screen, so can choose between vertical scroll or horizontal stretch
+                    CabExceedsDisplay = (int)((unstretchedCabHeightPixels - windowHeight) * ((100 - Settings.Cab2DStretch) / 100f));
+                    CabExceedsDisplayHorizontally = 0;
+                }
+                else
+                {
+                    // must scroll horizontally
+                    CabExceedsDisplay = 0;
+                    CabExceedsDisplayHorizontally = unstretchedCabWidthPixels - windowWidth;
+                }
+                CabHeightPixels = windowHeight + CabExceedsDisplay;
+                CabYOffsetPixels = -CabExceedsDisplay / 2; // Initial value is halfway. User can adjust with arrow keys.
+                CabWidthPixels = windowWidth + CabExceedsDisplayHorizontally;
+                CabXOffsetPixels = CabExceedsDisplayHorizontally / 2;
+                CabXLetterboxPixels = CabYLetterboxPixels = 0;
             }
-            CabHeightPixels = windowHeight + CabExceedsDisplay;
-            CabYOffsetPixels = -CabExceedsDisplay / 2; // Initial value is halfway. User can adjust with arrow keys.
-            CabWidthPixels = windowWidth + CabExceedsDisplayHorizontally;
-            CabXOffsetPixels = CabExceedsDisplayHorizontally / 2;
             if (CabCamera.IsAvailable) CabCamera.Initialize();
         }
 
@@ -647,7 +700,8 @@ namespace Orts.Viewer3D
             if (cabTexture != SharedMaterialManager.MissingTexture)
             {
                 cabTextureInverseRatio = (float)cabTexture.Height / cabTexture.Width;
-                if (cabTextureInverseRatio == 1 && cabTexture.Width == 1024) cabTextureInverseRatio = 0.75f;
+                // if square cab texture files with dimension of at least 1024 pixels are used, they are considered as stretched 4 : 3 ones
+                if (cabTextureInverseRatio == 1 && cabTexture.Width >= 1024) cabTextureInverseRatio = 0.75f; 
             }
             return cabTextureInverseRatio;
         }
@@ -661,7 +715,7 @@ namespace Orts.Viewer3D
         [CallOnThread("Updater")]
         internal void UpdateAdapterInformation(GraphicsAdapter graphicsAdapter)
         {
-            adapterDescription = GraphicsAdapter.DefaultAdapter.Description;
+            adapterDescription = graphicsAdapter.Description;
             try
             {
                 // Note that we might find multiple adapters with the same
@@ -963,28 +1017,28 @@ namespace Orts.Viewer3D
 
             if (UserInput.IsPressed(UserCommand.CameraCab))
             {
-                if (CabCamera.IsAvailable)
+                if (CabCamera.IsAvailable || ThreeDimCabCamera.IsAvailable)
                 {
                     new UseCabCameraCommand(Log);
-                }
-                else if (ThreeDimCabCamera.IsAvailable)
-                {
-                    new Use3DCabCameraCommand(Log);
                 }
                 else
                 {
                     Simulator.Confirmer.Warning(Viewer.Catalog.GetString("Cab view not available"));
                 }
             }
-            if (UserInput.IsPressed(UserCommand.CameraThreeDimensionalCab))
+            if (UserInput.IsPressed(UserCommand.CameraToggleThreeDimensionalCab))
             {
-                if (ThreeDimCabCamera.IsAvailable)
+                if (!CabCamera.IsAvailable)
                 {
-                    new Use3DCabCameraCommand(Log);
+                    Simulator.Confirmer.Warning(Viewer.Catalog.GetString("This car doesn't have a 2D cab"));
+                }
+                else if (!ThreeDimCabCamera.IsAvailable)
+                {
+                    Simulator.Confirmer.Warning(Viewer.Catalog.GetString("This car doesn't have a 3D cab"));
                 }
                 else
                 {
-                    Simulator.Confirmer.Warning(Viewer.Catalog.GetString("3D Cab view not available"));
+                    new ToggleThreeDimensionalCabCameraCommand(Log);
                 }
             }
             if (UserInput.IsPressed(UserCommand.CameraOutsideFront))
@@ -1099,29 +1153,23 @@ namespace Orts.Viewer3D
                 if (Program.DebugViewer != null && Program.DebugViewer.Enabled && (Program.DebugViewer.switchPickedItem != null || Program.DebugViewer.signalPickedItem != null))
                 {
                     WorldLocation wos;
-                    try
+                    TrJunctionNode nextSwitchTrack = Program.DebugViewer.switchPickedItem?.Item?.TrJunctionNode;
+                    if (nextSwitchTrack != null)
                     {
-                        if (Program.DebugViewer.switchPickedItem != null)
-                        {
-                            TrJunctionNode nextSwitchTrack = Program.DebugViewer.switchPickedItem.Item.TrJunctionNode;
-                            wos = new WorldLocation(nextSwitchTrack.TN.UiD.TileX, nextSwitchTrack.TN.UiD.TileZ, nextSwitchTrack.TN.UiD.X, nextSwitchTrack.TN.UiD.Y + 8, nextSwitchTrack.TN.UiD.Z);
-                        }
-                        else
-                        {
-                            var s = Program.DebugViewer.signalPickedItem.Item;
-                            wos = new WorldLocation(s.TileX, s.TileZ, s.X, s.Y + 8, s.Z);
-                        }
-                        if (FreeRoamCameraList.Count == 0)
-                        {
-                            new UseFreeRoamCameraCommand(Log);
-                        }
-                        FreeRoamCamera.SetLocation(wos);
-                        //FreeRoamCamera
-                        FreeRoamCamera.Activate();
+                        wos = new WorldLocation(nextSwitchTrack.TN.UiD.TileX, nextSwitchTrack.TN.UiD.TileZ, nextSwitchTrack.TN.UiD.X, nextSwitchTrack.TN.UiD.Y + 8, nextSwitchTrack.TN.UiD.Z);
                     }
-                    catch { }
-
-
+                    else
+                    {
+                        var s = Program.DebugViewer.signalPickedItem.Item;
+                        wos = new WorldLocation(s.TileX, s.TileZ, s.X, s.Y + 8, s.Z);
+                    }
+                    if (FreeRoamCameraList.Count == 0)
+                    {
+                        new UseFreeRoamCameraCommand(Log);
+                    }
+                    FreeRoamCamera.SetLocation(wos);
+                    //FreeRoamCamera
+                    FreeRoamCamera.Activate();
                 }
             }
 
@@ -1335,7 +1383,8 @@ namespace Orts.Viewer3D
                     if (MousePickedControl != null & MousePickedControl != OldMousePickedControl)
                     {
                         // say what control you have here
-                        Simulator.Confirmer.Message(ConfirmLevel.None, MousePickedControl.GetControlType().ToString());
+                        Simulator.Confirmer.Message(ConfirmLevel.None,
+                            (PlayerLocomotive as MSTSLocomotive).TrainControlSystem.GetDisplayString(MousePickedControl.GetControlType().ToString()));
                     }
                     if (MousePickedControl != null) ActualCursor = Cursors.Hand;
                     else if (ActualCursor == Cursors.Hand) ActualCursor = Cursors.Default;
@@ -1458,7 +1507,8 @@ namespace Orts.Viewer3D
                     if (MousePickedControl != null & MousePickedControl != OldMousePickedControl)
                     {
                         // say what control you have here
-                        Simulator.Confirmer.Message(ConfirmLevel.None, MousePickedControl.GetControlType().ToString());
+                        Simulator.Confirmer.Message(ConfirmLevel.None,
+                            (PlayerLocomotive as MSTSLocomotive).TrainControlSystem.GetDisplayString(MousePickedControl.GetControlType().ToString()));
                     }
                     if (MousePickedControl != null)
                     {
@@ -1531,7 +1581,9 @@ namespace Orts.Viewer3D
             PlayerLocomotiveViewer = World.Trains.GetViewer(Simulator.PlayerLocomotive);
             if (PlayerLocomotiveViewer is MSTSLocomotiveViewer && (PlayerLocomotiveViewer as MSTSLocomotiveViewer)._hasCabRenderer)
                 AdjustCabHeight(DisplaySize.X, DisplaySize.Y);
-            Camera.Activate(); // If you need anything else here the cameras should check for it.        
+            if (!Simulator.PlayerLocomotive.HasFront3DCab && !Simulator.PlayerLocomotive.HasRear3DCab)
+                CabCamera.Activate(); // If you need anything else here the cameras should check for it.
+            else ThreeDimCabCamera.Activate();
             SetCommandReceivers();
             ThreeDimCabCamera.ChangeCab(Simulator.PlayerLocomotive);
             HeadOutForwardCamera.ChangeCab(Simulator.PlayerLocomotive);
@@ -1742,7 +1794,7 @@ namespace Orts.Viewer3D
             if (frame.IsScreenChanged)
             {
                 WindowManager.ScreenChanged();
-                AdjustCabHeight(RenderProcess.GraphicsDeviceManager.PreferredBackBufferWidth, RenderProcess.GraphicsDeviceManager.PreferredBackBufferHeight);
+                AdjustCabHeight(DisplaySize.X, DisplaySize.Y);
             }
 
             MaterialManager.UpdateShaders();
@@ -1790,18 +1842,12 @@ namespace Orts.Viewer3D
         [CallOnThread("Render")]
         void SaveScreenshotToFile(GraphicsDevice graphicsDevice, string fileName, bool silent)
         {
-            if (graphicsDevice.GraphicsProfile != GraphicsProfile.HiDef)
-                return;
+            var width = graphicsDevice.PresentationParameters.BackBufferWidth;
+            var height = graphicsDevice.PresentationParameters.BackBufferHeight;
+            var data = new uint[width * height];
 
-            int w = graphicsDevice.PresentationParameters.BackBufferWidth;
-            int h = graphicsDevice.PresentationParameters.BackBufferHeight;
-            int[] backBuffer = new int[w * h];
+            graphicsDevice.GetBackBufferData(data);
 
-
-            graphicsDevice.GetBackBufferData(backBuffer);
-            //copy into a texture 
-            Texture2D screenshot = new Texture2D(GraphicsDevice, w, h, false, GraphicsDevice.PresentationParameters.BackBufferFormat);
-            screenshot.SetData(backBuffer);
             new Thread(() =>
             {
                 try
@@ -1809,18 +1855,19 @@ namespace Orts.Viewer3D
                     // Unfortunately, the back buffer includes an alpha channel. Although saving this might seem okay,
                     // it actually ruins the picture - nothing in the back buffer is seen on-screen according to its
                     // alpha, it's only used for blending (if at all). We'll remove the alpha here.
-                    var data = new uint[screenshot.Width * screenshot.Height];
-                    screenshot.GetData(data);
                     for (var i = 0; i < data.Length; i++)
                         data[i] |= 0xFF000000;
-                    screenshot.SetData(data);
 
-                    // Now save the modified image.
-                    using (var stream = File.OpenWrite(fileName))
+                    using (var screenshot = new Texture2D(graphicsDevice, width, height))
                     {
-                        screenshot.SaveAsPng(stream, w, h);
+                        screenshot.SetData(data);
+
+                        // Now save the modified image.
+                        using (var stream = File.OpenWrite(fileName))
+                        {
+                            screenshot.SaveAsPng(stream, width, height);
+                        }
                     }
-                    screenshot.Dispose();
 
                     if (!silent)
                         MessagesWindow.AddMessage(String.Format("Saving screenshot to '{0}'.", fileName), 10);

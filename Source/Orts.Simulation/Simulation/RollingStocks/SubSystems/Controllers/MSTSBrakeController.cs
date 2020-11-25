@@ -16,6 +16,7 @@
 // along with Open Rails.  If not, see <http://www.gnu.org/licenses/>.
 
 using ORTS.Scripting.Api;
+using System;
 using System.Diagnostics;
 
 namespace Orts.Simulation.RollingStocks.SubSystems.Controllers
@@ -104,12 +105,17 @@ namespace Orts.Simulation.RollingStocks.SubSystems.Controllers
                     switch (notch.Type)
                     {
                         case ControllerState.Release:
-                            pressureBar += x * ReleaseRateBarpS() * elapsedClockSeconds;
+                            IncreasePressure(ref pressureBar, MaxPressureBar(), ReleaseRateBarpS(), elapsedClockSeconds);
+                            DecreasePressure(ref pressureBar, MaxPressureBar(), OverchargeEliminationRateBarpS(), elapsedClockSeconds);
                             epState = -1;
                             break;
                         case ControllerState.FullQuickRelease:
-                            pressureBar += x * QuickReleaseRateBarpS() * elapsedClockSeconds;
+                            IncreasePressure(ref pressureBar, MaxPressureBar(), QuickReleaseRateBarpS(), elapsedClockSeconds);
+                            DecreasePressure(ref pressureBar, MaxPressureBar(), OverchargeEliminationRateBarpS(), elapsedClockSeconds);
                             epState = -1;
+                            break;
+                        case ControllerState.Overcharge:
+                            IncreasePressure(ref pressureBar, Math.Min(MaxOverchargePressureBar(), MainReservoirPressureBar()), QuickReleaseRateBarpS(), elapsedClockSeconds);
                             break;
                         case ControllerState.Apply:
                         case ControllerState.FullServ:
@@ -133,7 +139,9 @@ namespace Orts.Simulation.RollingStocks.SubSystems.Controllers
                                 epState = -1;
                             }
                             break;
+                        case ControllerState.ManualBraking:
                         case ControllerState.VacContServ:
+                        case ControllerState.VacApplyContServ:
                             // Continuous service position for vacuum brakes - allows brake to be adjusted up and down continuously between the ON and OFF position
                             pressureBar = (1 - x) * MaxPressureBar();
                             epState = -1;
@@ -166,8 +174,6 @@ namespace Orts.Simulation.RollingStocks.SubSystems.Controllers
                 }
             }
 
-            if (pressureBar > MaxPressureBar())
-                pressureBar = MaxPressureBar();
             if (pressureBar < 0)
                 pressureBar = 0;
             epControllerState = epState;
@@ -199,6 +205,15 @@ namespace Orts.Simulation.RollingStocks.SubSystems.Controllers
                     case ControllerState.Apply:
                     case ControllerState.FullServ:
                         IncreasePressure(ref pressureBar, x * (MaxPressureBar() - FullServReductionBar()), ApplyRateBarpS(), elapsedClockSeconds);
+                        break;
+                    case ControllerState.ManualBraking:
+                    case ControllerState.VacContServ:
+                    // Continuous service positions for vacuum brakes - allows brake to be adjusted up and down continuously between the ON and OFF position
+                        pressureBar = (1 - x) * MaxPressureBar();
+                        break;
+                    case ControllerState.BrakeNotch:
+                        // Notch position for brakes - allows brake to be adjusted up and down continuously between specified notches
+                        pressureBar = (1 - x) * MaxPressureBar();
                         break;
                     case ControllerState.Emergency:
                         pressureBar += EmergencyRateBarpS() * elapsedClockSeconds;

@@ -16,6 +16,7 @@
 // along with Open Rails.  If not, see <http://www.gnu.org/licenses/>.
 
 using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework;
 using Orts.Formats.Msts;
 using Orts.Simulation.AIs;
 using Orts.Simulation.Physics;
@@ -266,7 +267,7 @@ namespace Orts.Simulation
             }
             else
             {
-                if (Simulator.OriginalPlayerTrain.SpeedMpS == 0)
+                if (Math.Abs(Simulator.OriginalPlayerTrain.SpeedMpS) <= Simulator.MaxStoppedMpS)
                 {
                     if (prevTrainSpeed != 0)
                     {
@@ -527,7 +528,7 @@ namespace Orts.Simulation
                 newSpeedPostItems[1] = new TempSpeedPostItem(routeFile,
                     zones.ActivityRestrictedSpeedZoneList[idxZone].EndPosition, false, worldPosition2, false);
 			
-            // Add the speedposts to the track database. This will set the TrItemId's of all speedposts
+                // Add the speedposts to the track database. This will set the TrItemId's of all speedposts
             trackDB.AddTrItems(newSpeedPostItems);
 
             // And now update the various (vector) tracknodes (this needs the TrItemIds.
@@ -538,11 +539,11 @@ namespace Orts.Simulation
                 float distanceOfWarningPost = 0;
                 TrackNode trackNode = trackDB.TrackNodes[traveller.TrackNodeIndex];
                 if (startOffset != null && endOffset != null && startOffset > endOffset)
-			{
+                {
                     FlipRestrSpeedPost((TempSpeedPostItem)newSpeedPostItems[0]);
                     FlipRestrSpeedPost((TempSpeedPostItem)newSpeedPostItems[1]);
                     distanceOfWarningPost = (float)Math.Min(MaxDistanceOfWarningPost, traveller.TrackNodeLength - (double)startOffset);
-            }
+                }
                 else if (startOffset != null && endOffset != null && startOffset <= endOffset)
                     distanceOfWarningPost = (float)Math.Max(-MaxDistanceOfWarningPost, -(double)startOffset);
                 traveller.Move(distanceOfWarningPost);
@@ -553,7 +554,7 @@ namespace Orts.Simulation
                 if (startOffset != null && endOffset != null && startOffset > endOffset)
                 {
                     FlipRestrSpeedPost((TempSpeedPostItem)speedWarningPostItem);
-        }
+                }
                 ComputeTablePosition((TempSpeedPostItem)newSpeedPostItems[0]); 
                 TempSpeedPostItems.Add((TempSpeedPostItem)newSpeedPostItems[0]);
                 ComputeTablePosition((TempSpeedPostItem)newSpeedPostItems[1]); 
@@ -575,15 +576,15 @@ namespace Orts.Simulation
         {
             float? offset = 0.0f;
             traveller = new Traveller(tsectionDat, trackDB.TrackNodes, position.TileX, position.TileZ, position.X, position.Z);
-                TrackNode trackNode = trackDB.TrackNodes[traveller.TrackNodeIndex];//find the track node
-                if (trackNode.TrVectorNode != null)
-                {
+            TrackNode trackNode = trackDB.TrackNodes[traveller.TrackNodeIndex];//find the track node
+            if (trackNode.TrVectorNode != null)
+            {
                 offset = traveller.TrackNodeOffset;
                 SpeedPostPosition((TempSpeedPostItem)newTrItem, ref traveller);
                 InsertTrItemRef(tsectionDat, trackDB, trackNode.TrVectorNode, (int)newTrItem.TrItemId, (float)offset);
-                }
-            return offset;
             }
+            return offset;
+        }
 
         /// <summary>
         /// Determine position parameters of restricted speed Post
@@ -617,7 +618,7 @@ namespace Orts.Simulation
             restrSpeedPost.WorldPosition.XNAMatrix.M13 *= -1;
             restrSpeedPost.WorldPosition.XNAMatrix.M31 *= -1;
             restrSpeedPost.WorldPosition.XNAMatrix.M33 *= -1;
-    }
+        }
 
         /// <summary>
         /// Compute position of restricted speedpost table
@@ -848,7 +849,8 @@ namespace Orts.Simulation
             // The train is stopped.
             if (EventType == ActivityEventType.TrainStop)
             {
-                if (IsAtStation(MyPlayerTrain))
+                if (MyPlayerTrain.TrainType != Train.TRAINTYPE.AI_PLAYERHOSTING && IsAtStation(MyPlayerTrain)  ||
+                    MyPlayerTrain.TrainType == Train.TRAINTYPE.AI_PLAYERHOSTING && (MyPlayerTrain as AITrain).MovementState == AITrain.AI_MOVEMENT_STATE.STATION_STOP)
                 {
                     if (Simulator.TimetableMode || MyPlayerTrain.StationStops.Count == 0)
                     {
@@ -1102,6 +1104,7 @@ namespace Orts.Simulation
             outf.Write((Int32)PlatformEnd1.TrItemId);
             outf.Write((Int32)PlatformEnd2.TrItemId);
             outf.Write((double)BoardingEndS);
+            outf.Write((double)BoardingS);
             outf.Write((Int32)TimerChk);
             outf.Write(arrived);
             outf.Write(maydepart);
@@ -1123,6 +1126,7 @@ namespace Orts.Simulation
             PlatformEnd1 = Simulator.TDB.TrackDB.TrItemTable[inf.ReadInt32()] as PlatformItem;
             PlatformEnd2 = Simulator.TDB.TrackDB.TrItemTable[inf.ReadInt32()] as PlatformItem;
             BoardingEndS = inf.ReadDouble();
+            BoardingS = inf.ReadDouble();
             TimerChk = inf.ReadInt32();
             arrived = inf.ReadBoolean();
             maydepart = inf.ReadBoolean();
@@ -1317,9 +1321,8 @@ namespace Orts.Simulation
                 case EventType.AssembleTrainAtLocation:
                     if (atSiding(OriginalPlayerTrain.FrontTDBTraveller, OriginalPlayerTrain.RearTDBTraveller, this.SidingEnd1, this.SidingEnd2))
                     {
-                        consistTrain = null;
                         consistTrain = matchesConsist(ChangeWagonIdList);
-                        triggered = (consistTrain != null ? true : false);
+                        triggered = consistTrain != null;
                     }
                     break;
                 case EventType.DropOffWagonsAtLocation:
@@ -1328,9 +1331,8 @@ namespace Orts.Simulation
                     // To recognize the dropping off of the cars before the event is activated, this method is used.
                     if (atSiding(OriginalPlayerTrain.FrontTDBTraveller, OriginalPlayerTrain.RearTDBTraveller, this.SidingEnd1, this.SidingEnd2))
                     {
-                        consistTrain = null;
                         consistTrain = matchesConsistNoOrder(ChangeWagonIdList);
-                        triggered = (consistTrain != null ? false : true);
+                        triggered = consistTrain != null;
                     }
                     break;
                 case EventType.PickUpPassengers:
@@ -1384,12 +1386,10 @@ namespace Orts.Simulation
         {
             foreach (var trainItem in Simulator.Trains)
             {
-                bool lEngine = false;
                 int nCars = 0;//all cars other than WagonIdList.
                 int nWagonListCars = 0;//individual wagon drop.
                 foreach (var item in trainItem.Cars)
                 {
-                    if (item.AuxWagonType == "Engine") lEngine = true;
                     if (!wagonIdList.Contains(item.CarID)) nCars++;
                     if (wagonIdList.Contains(item.CarID)) nWagonListCars++;
                 }
@@ -1399,13 +1399,11 @@ namespace Orts.Simulation
                 if (trainItem.Cars.Count - nCars == (wagonIdList.Count == nWagonListCars ? wagonIdList.Count : nWagonListCars))
                 {
                     if (excludesWagons(trainItem, wagonIdList)) listsMatch = false;//all wagons dropped
-
-                    //a consist require engine + wagons
-                    if (listsMatch && lEngine) return trainItem;
+                    
+                    if (listsMatch) return trainItem;
+                    
                 }
-                else if (lEngine)
-                    //TODO: Maybe, it would be necessary to avoid detach cars that are not included in wagonIdList.
-                    return trainItem;
+               
             }
             return null;
         }
@@ -1434,6 +1432,10 @@ namespace Orts.Simulation
         /// <returns>True if all listed wagons are not part of the given train.</returns>
         static bool excludesWagons(Train train, List<string> wagonIdList)
         {
+            // The Cars list is a global list that includes STATIC cars.  We need to make sure that the active train/car is processed only.
+            if (train.TrainType == Train.TRAINTYPE.STATIC)
+                return true;
+
             bool lNotFound = false;
             foreach (var item in wagonIdList)
             {
@@ -1447,7 +1449,7 @@ namespace Orts.Simulation
                     lNotFound = false; break;//wagon still part of the train
                 }
             }
-            return (lNotFound? true : false);
+            return lNotFound;
         }
         /// <summary>
         /// Like platforms, checking that one end of the train is within the siding.

@@ -196,6 +196,15 @@ Trigger       Function
 143           BrakePipePressureStoppedChanging : for rolling stock equipped with train brakes, triggered when brake pipe/brakeline pressure stops changing
 =========     ============================================================================================================================================================================
 
+
+=========     ======================================================================
+Trigger       Function
+=========     ======================================================================
+147           SteamGearLeverToggle : Toggles when steam gear lever is moved.
+148           AIFiremanSoundOn : AI fireman mode is on.
+149           AIFiremanSoundOff : AI fireman mode is off, ie in Manual Firing mode.
+=========     ======================================================================
+
 Triggers from 150 to 158 are used for the circuit breaker sounds.
 
 The following triggers are activated when the state of the circuit breaker changes:
@@ -256,8 +265,52 @@ Trigger       Function
 172           Pantograph4Down
 =========     =====================================
 
+The following triggers are used to activate the gear positions:
+
+=========     =====================================
+Trigger       Function
+=========     =====================================
+200           GearPosition0
+201           GearPosition1
+202           GearPosition2
+203           GearPosition3
+204           GearPosition4
+205           GearPosition5
+206           GearPosition6
+207           GearPosition7
+208           GearPosition8
+=========     =====================================
+
 Variable Triggers
 -----------------
+
+ORTS
+^^^^
+
+The sound objects attached to a vehicle (wagon or loco) can respond in volume and frequency to changes in the vehicle's properties.
+There are 7 properties:
+
+- distance squared from a sound source (m\ :sup:`2`)
+
+- speed (m/s)	
+
+- pressure in the brake cylinder (psi)	
+
+- centrifugal force due to traversing a curve (N)	
+
+- 3 variables in range 0 - 1:
+
+  - Variable1 reflects the throttle
+
+  - Variable2 reflects the engine's RPM (diesel) or Tractive Force (electric) or cylinder pressure (steam)
+
+  - Variable3 reflects the dynamic brake (diesel | electric) or fuel rate (steam)
+		
+Note: Separately, for a whole route, sounds for all curves below a certain radius can be automatically triggered as vehicles pass - see :ref:`sound-curve` below.		
+
+
+Comparison with MSTS
+^^^^^^^^^^^^^^^^^^^^
 
 OR manages all of the variable triggers managed by MSTS. There can be some 
 difference in the relationship between physical locomotive variables (e.g. 
@@ -302,6 +355,8 @@ Testing Sound Files at Runtime
 
 The :ref:`sound debug window <driving-sound-debug>` is a useful tool for 
 testing.
+
+.. _sound-curve:
 
 Automatic switch and curve squeal track sound
 =============================================
@@ -357,6 +412,12 @@ To enable this feature steps here below must be followed:
      TrackType ( "Squeal Curve" "DemoAutoSound/curvesquealtrackin.sms" "DemoAutoSound/curvesquealtrackex.sms"   )
      TrackType ( "Squeal Switch" "DemoAutoSound/curveswitchtrackin.sms" "DemoAutoSound/curveswitchtrackex.sms"   )
 
+.. index::
+   single: ORTSSwitchSMSNumber
+   single: ORTSCurveSMSNumber
+   single: ORTSCurveSwitchSMSNumber
+   single: ORTSDefaultTurntableSMS
+
 3. For every route you must tell OR which of the ttype sound files are those related to 
    automatic sounds. This is done by inserting following line in the route's ``.trk`` file::
      
@@ -393,6 +454,10 @@ Override % of external sound heard internally for a specific trainset
 External sounds are reproduced at a lower volume when heard within a cab or 
 passenger view. The % of external sound heard internally is defined in the 
 ``Audio Options`` menu window.
+
+.. index::
+   single: ORTSExternalSoundPassedThroughPercent
+
 This percentage may be overridden for any trainset inserting in the Wagon 
 section of any .eng or .wag file (or in their "include" file as explained 
 :ref:`here <physics-inclusions>`) following line::

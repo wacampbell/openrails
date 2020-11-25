@@ -45,6 +45,10 @@ namespace ORTS.Scripting.Api
         /// </summary>
         public Func<float> MaxPressureBar;
         /// <summary>
+        /// Maximum pressure in the brake pipes when they are overcharged
+        /// </summary>
+        public Func<float> MaxOverchargePressureBar;
+        /// <summary>
         /// Release rate of the equalizing reservoir
         /// </summary>
         public Func<float> ReleaseRateBarpS;
@@ -52,6 +56,10 @@ namespace ORTS.Scripting.Api
         /// Quick release rate of the equalizing reservoir
         /// </summary>
         public Func<float> QuickReleaseRateBarpS;
+        /// <summary>
+        /// Pressure decrease rate of equalizing reservoir when eliminating overcharge
+        /// </summary>
+        public Func<float> OverchargeEliminationRateBarpS;
         /// <summary>
         /// Apply rate of the equalizing reservoir
         /// </summary>
@@ -214,7 +222,10 @@ namespace ORTS.Scripting.Api
         EBPB,               // Emergency Braking Push Button
         TCSEmergency,       // TCS Emergency Braking
         TCSFullServ,        // TCS Full Service Braking
-        VacContServ         // TrainBrakesControllerVacuumContinuousServiceStart
+        VacContServ,         // TrainBrakesControllerVacuumContinuousServiceStart
+        VacApplyContServ,    // TrainBrakesControllerVacuumApplyContinuousServiceStart
+        ManualBraking,        // BrakemanBrakesControllerManualBraking
+        BrakeNotch           // EngineBrakesControllerBrakeNotchStart
     };
 
     public static class ControllerStateDictionary
@@ -244,7 +255,10 @@ namespace ORTS.Scripting.Api
             {ControllerState.EBPB, Catalog.GetString("Emergency Braking Push Button")},
             {ControllerState.TCSEmergency, Catalog.GetString("TCS Emergency Braking")},
             {ControllerState.TCSFullServ, Catalog.GetString("TCS Full Service Braking")},
-            {ControllerState.VacContServ, Catalog.GetString("Vac. Cont. Service")}
+            {ControllerState.VacContServ, Catalog.GetString("Vac. Cont. Service")},
+            {ControllerState.VacApplyContServ, Catalog.GetString("Vac. Apply Cont. Service")},
+            {ControllerState.ManualBraking, Catalog.GetString("Manual Braking")},
+            {ControllerState.BrakeNotch, Catalog.GetString("Notch")}
         };
     }
 }

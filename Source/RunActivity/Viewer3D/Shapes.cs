@@ -255,7 +255,7 @@ namespace Orts.Viewer3D
     /// </summary>
     public class PoseableShape : StaticShape
     {
-        static Dictionary<string, bool> SeenShapeAnimationError = new Dictionary<string, bool>();
+        protected static Dictionary<string, bool> SeenShapeAnimationError = new Dictionary<string, bool>();
 
         public Matrix[] XNAMatrices = new Matrix[0];  // the positions of the subobjects
 
@@ -406,7 +406,7 @@ namespace Orts.Viewer3D
         public override void PrepareFrame(RenderFrame frame, ElapsedTime elapsedTime)
         {
             // if the shape has animations
-            if (SharedShape.Animations != null && SharedShape.Animations.Count > 0 && SharedShape.Animations[0].FrameCount > 1)
+            if (SharedShape.Animations?.Count > 0 && SharedShape.Animations[0].FrameCount > 0)
             {
                 AnimationKey += SharedShape.Animations[0].FrameRate * elapsedTime.ClockSeconds * FrameRateMultiplier;
                 while (AnimationKey > SharedShape.Animations[0].FrameCount) AnimationKey -= SharedShape.Animations[0].FrameCount;
@@ -628,6 +628,12 @@ namespace Orts.Viewer3D
             // TODO: Make this use AddAutoPrimitive instead.
             frame.AddPrimitive(this.shapePrimitive.Material, this.shapePrimitive, RenderPrimitiveGroup.World, ref xnaXfmWrtCamTile, ShapeFlags.None);
 
+            // if there is no animation, that's normal and so no animation missing error is displayed
+            if (SharedShape.Animations == null || SharedShape.Animations.Count == 0)
+            {
+                if (!SeenShapeAnimationError.ContainsKey(SharedShape.FilePath))
+                    SeenShapeAnimationError[SharedShape.FilePath] = true;
+            }
             // Update the pose
             for (int iMatrix = 0; iMatrix < SharedShape.Matrices.Length; ++iMatrix)
                 AnimateMatrix(iMatrix, AnimationKey);
@@ -645,8 +651,8 @@ namespace Orts.Viewer3D
     public class LevelCrossingShape : PoseableShape
     {
         readonly LevelCrossingObj CrossingObj;
-		readonly SoundSource Sound;
-		readonly LevelCrossing Crossing;
+        readonly SoundSource Sound;
+        readonly LevelCrossing Crossing;
 
         readonly float AnimationFrames;
         readonly float AnimationSpeed;
@@ -1214,7 +1220,8 @@ namespace Orts.Viewer3D
         protected internal int MinVertexIndex;
         protected internal int NumVerticies;
         protected internal int PrimitiveCount;
-        protected internal VertexBufferBinding[] VertexBufferBindings;
+
+        readonly VertexBufferBinding[] VertexBufferBindings;
 
         public ShapePrimitive()
         {
@@ -1231,9 +1238,7 @@ namespace Orts.Viewer3D
             Hierarchy = hierarchy;
             HierarchyIndex = hierarchyIndex;
 
-            DummyVertexBuffer = new VertexBuffer(material.Viewer.GraphicsDevice, DummyVertexDeclaration, 1, BufferUsage.WriteOnly);
-            DummyVertexBuffer.SetData(DummyVertexData);
-            VertexBufferBindings = new[] { new VertexBufferBinding(VertexBuffer), new VertexBufferBinding(DummyVertexBuffer) };
+            VertexBufferBindings = new[] { new VertexBufferBinding(VertexBuffer), new VertexBufferBinding(GetDummyVertexBuffer(material.Viewer.GraphicsDevice)) };
         }
 
         public ShapePrimitive(Material material, SharedShape.VertexBufferSet vertexBufferSet, List<ushort> indexData, GraphicsDevice graphicsDevice, int[] hierarchy, int hierarchyIndex)
@@ -1296,7 +1301,8 @@ namespace Orts.Viewer3D
         protected VertexDeclaration InstanceDeclaration;
         protected int InstanceBufferStride;
         protected int InstanceCount;
-        protected VertexBufferBinding[] VertexBufferBindings;
+
+        readonly VertexBufferBinding[] VertexBufferBindings;
 
         internal ShapePrimitiveInstances(GraphicsDevice graphicsDevice, ShapePrimitive shapePrimitive, Matrix[] positions, int subObjectIndex)
         {
@@ -1569,6 +1575,7 @@ namespace Orts.Viewer3D
                 SceneryMaterialOptions.TextureAddressModeWrap,
                 SceneryMaterialOptions.TextureAddressModeMirror,
                 SceneryMaterialOptions.TextureAddressModeClamp,
+                SceneryMaterialOptions.TextureAddressModeBorder,
             };
 
             static readonly Dictionary<string, SceneryMaterialOptions> ShaderNames = new Dictionary<string, SceneryMaterialOptions> {

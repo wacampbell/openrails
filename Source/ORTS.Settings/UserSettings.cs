@@ -90,6 +90,13 @@ namespace ORTS.Settings
         }
         #endregion
 
+        public enum DirectXFeature
+        {
+            Level9_1,
+            Level9_3,
+            Level10_0,
+        }
+
         #region User Settings
 
         // Please put all user settings in here as auto-properties. Public properties
@@ -110,8 +117,16 @@ namespace ORTS.Settings
         public string Multiplayer_Host { get; set; }
         [Default(30000)]
         public int Multiplayer_Port { get; set; }
+        [Default(true)]
+        public bool IsModeActivity { get; set; } // false indicates Timetable mode
 
         // General settings:
+
+        [Default(false)]
+        public bool WebServer { get; set; }
+        [Default(2150)]
+        public int WebServerPort { get; set; }
+
         [Default(false)]
         public bool Alerter { get; set; }
         [Default(true)]
@@ -164,8 +179,6 @@ namespace ORTS.Settings
         public bool Wire { get; set; }
         [Default(false)]
         public bool VerticalSync { get; set; }
-        [Default(true)]
-        public bool EnableMultisampling { get; set; }
         [Default(0)]
         public int Cab2DStretch { get; set; }
         [Default(2000)]
@@ -184,6 +197,9 @@ namespace ORTS.Settings
         public int DayAmbientLight { get; set; }
 
         // Simulation settings:
+
+        [Default(false)]
+        public bool SimpleControlPhysics { get; set; }
         [Default(true)]
         public bool UseAdvancedAdhesion { get; set; }
         [Default(10)]
@@ -202,8 +218,6 @@ namespace ORTS.Settings
         public bool OverrideNonElectrifiedRoutes { get; set; }
         [Default(true)]
         public bool HotStart { get; set; }
-        [Default(false)]
-        public bool Autopilot { get; set; }
 
         // Data logger settings:
         [Default("comma")]
@@ -220,8 +234,9 @@ namespace ORTS.Settings
         public bool DataLogMisc { get; set; }
         [Default(false)]
         public bool DataLogSteamPerformance { get; set; }
-        
-        
+        [Default(false)]
+        public bool VerboseConfigurationMessages { get; set; }
+
         // Evaluation settings:
         [Default(false)]
         public bool DataLogTrainSpeed { get; set; }
@@ -287,8 +302,6 @@ namespace ORTS.Settings
         public bool NoForcedRedAtStationStops { get; set; }
         [Default(false)]
         public bool ConditionalLoadOfDayOrNightTextures { get; set; }
-        [Default(false)]
-        public bool ExtendedAIShunting { get; set; }
         [Default(100)]
         public int PrecipitationBoxHeight { get; set; }
         [Default(500)]
@@ -315,6 +328,9 @@ namespace ORTS.Settings
         public string LoggingPath { get; set; }
         [Default("")]
         public string ScreenshotPath { get; set; }
+        [Default("")]
+        public string DirectXFeatureLevel { get; set; }
+        public bool IsDirectXFeatureLevelIncluded(DirectXFeature level) => (int)level <= (int)Enum.Parse(typeof(DirectXFeature), "Level" + this.DirectXFeatureLevel);
         [Default(true)]
         public bool ShadowMapBlur { get; set; }
         [Default(4)]
@@ -384,6 +400,18 @@ namespace ORTS.Settings
         [DoNotSave]
         public bool MultiplayerServer { get; set; }
 
+        // In-game settings:
+        [Default(false)]
+        public bool Letterbox2DCab { get; set; }
+        [Default(true)]
+        public bool Use3DCab { get; set; }
+        [Default(0x7)] // OSDLocations.DisplayState.Auto
+        public int OSDLocationsState { get; set; }
+        [Default(0x1)] // OSDCars.DisplayState.Trains
+        public int OSDCarsState { get; set; }
+        [Default(0)] // TrackMonitor.DisplayMode.All
+        public int TrackMonitorDisplayMode { get; set; }
+
         #endregion
 
         public FolderSettings Folders { get; private set; }
@@ -443,7 +471,10 @@ namespace ORTS.Settings
         {
             foreach (var property in GetProperties())
                 if (property.GetCustomAttributes(typeof(DoNotSaveAttribute), false).Length == 0)
+                {
+                    Console.WriteLine(property.Name, property.PropertyType);
                     Save(property.Name, property.PropertyType);
+                }
 
             Folders.Save();
             Input.Save();
